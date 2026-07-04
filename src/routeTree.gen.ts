@@ -20,6 +20,7 @@ import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConverterRouteImport } from './routes/_app.converter'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
+import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -75,12 +76,18 @@ const AppChatRoute = AppChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnalyzerRoute = AppAnalyzerRouteImport.update({
+  id: '/analyzer',
+  path: '/analyzer',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/analyzer': typeof AppAnalyzerRoute
   '/chat': typeof AppChatRoute
   '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/analyzer': typeof AppAnalyzerRoute
   '/chat': typeof AppChatRoute
   '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_app/analyzer': typeof AppAnalyzerRoute
   '/_app/chat': typeof AppChatRoute
   '/_app/converter': typeof AppConverterRoute
   '/_app/dashboard': typeof AppDashboardRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/sitemap.xml'
+    | '/analyzer'
     | '/chat'
     | '/converter'
     | '/dashboard'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/sitemap.xml'
+    | '/analyzer'
     | '/chat'
     | '/converter'
     | '/dashboard'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/sitemap.xml'
+    | '/_app/analyzer'
     | '/_app/chat'
     | '/_app/converter'
     | '/_app/dashboard'
@@ -241,10 +253,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChatRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/analyzer': {
+      id: '/_app/analyzer'
+      path: '/analyzer'
+      fullPath: '/analyzer'
+      preLoaderRoute: typeof AppAnalyzerRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAnalyzerRoute: typeof AppAnalyzerRoute
   AppChatRoute: typeof AppChatRoute
   AppConverterRoute: typeof AppConverterRoute
   AppDashboardRoute: typeof AppDashboardRoute
@@ -254,6 +274,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyzerRoute: AppAnalyzerRoute,
   AppChatRoute: AppChatRoute,
   AppConverterRoute: AppConverterRoute,
   AppDashboardRoute: AppDashboardRoute,
