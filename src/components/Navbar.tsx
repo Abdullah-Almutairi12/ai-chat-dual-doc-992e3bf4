@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { FileText, Languages } from "lucide-react";
+import { Languages } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 
 export function Navbar() {
@@ -10,11 +11,8 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-        <Link to="/" className="flex min-w-0 items-center gap-2 font-semibold">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-hero text-primary-foreground shadow-soft">
-            <FileText className="h-5 w-5" />
-          </span>
-          <span className="truncate text-lg tracking-tight">{t("brand")}</span>
+        <Link to="/" className="min-w-0">
+          <Logo size={34} />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

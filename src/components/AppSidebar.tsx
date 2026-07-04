@@ -3,6 +3,7 @@ import { FileText, LayoutDashboard, LogIn, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/Logo";
 import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 import { deleteDocument, getDocuments, type PdfDocument } from "@/lib/documents";
@@ -29,11 +30,8 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-sidebar">
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
-        <Link to="/" onClick={onNavigate} className="flex min-w-0 items-center gap-2 font-semibold text-sidebar-foreground">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-hero text-primary-foreground shadow-soft">
-            <FileText className="h-5 w-5" />
-          </span>
-          <span className="truncate text-base tracking-tight">{t("brand")}</span>
+        <Link to="/" onClick={onNavigate} className="min-w-0">
+          <Logo size={32} />
         </Link>
       </div>
 
