@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTablesRouteImport } from './routes/_app.tables'
+import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 
@@ -47,6 +48,11 @@ const AppTablesRoute = AppTablesRouteImport.update({
   path: '/tables',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProofreaderRoute = AppProofreaderRouteImport.update({
+  id: '/proofreader',
+  path: '/proofreader',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/chat': typeof AppChatRoute
   '/dashboard': typeof AppDashboardRoute
+  '/proofreader': typeof AppProofreaderRoute
   '/tables': typeof AppTablesRoute
 }
 export interface FileRoutesByTo {
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/chat': typeof AppChatRoute
   '/dashboard': typeof AppDashboardRoute
+  '/proofreader': typeof AppProofreaderRoute
   '/tables': typeof AppTablesRoute
 }
 export interface FileRoutesById {
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/chat': typeof AppChatRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/proofreader': typeof AppProofreaderRoute
   '/_app/tables': typeof AppTablesRoute
 }
 export interface FileRouteTypes {
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/chat'
     | '/dashboard'
+    | '/proofreader'
     | '/tables'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/chat'
     | '/dashboard'
+    | '/proofreader'
     | '/tables'
   id:
     | '__root__'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_app/chat'
     | '/_app/dashboard'
+    | '/_app/proofreader'
     | '/_app/tables'
   fileRoutesById: FileRoutesById
 }
@@ -170,6 +182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTablesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/proofreader': {
+      id: '/_app/proofreader'
+      path: '/proofreader'
+      fullPath: '/proofreader'
+      preLoaderRoute: typeof AppProofreaderRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -190,12 +209,14 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppChatRoute: typeof AppChatRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppProofreaderRoute: typeof AppProofreaderRoute
   AppTablesRoute: typeof AppTablesRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppChatRoute: AppChatRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppProofreaderRoute: AppProofreaderRoute,
   AppTablesRoute: AppTablesRoute,
 }
 
