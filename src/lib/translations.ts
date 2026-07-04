@@ -10,6 +10,7 @@ const en = {
   nav_features: "Features",
   nav_dashboard: "Dashboard",
   nav_login: "Login",
+  nav_admin: "Admin",
   nav_signup: "Sign up",
 
   // hero
@@ -151,6 +152,7 @@ const ar: Record<keyof typeof en, string> = {
   nav_features: "المميزات",
   nav_dashboard: "لوحة التحكم",
   nav_login: "تسجيل الدخول",
+  nav_admin: "الإدارة",
   nav_signup: "إنشاء حساب",
 
   hero_badge: "مدعوم بالذكاء الاصطناعي · ثنائي اللغة",
