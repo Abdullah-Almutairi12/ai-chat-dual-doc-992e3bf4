@@ -24,6 +24,7 @@ import { Route as AppConverterRouteImport } from './routes/_app.converter'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminFinancialsRouteImport } from './routes/_authenticated/admin.financials'
@@ -102,6 +103,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const ApiPublicTapWebhookRoute = ApiPublicTapWebhookRouteImport.update({
+  id: '/api/public/tap-webhook',
+  path: '/api/public/tap-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -183,6 +191,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/tap-webhook'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/tap-webhook'
     | '/admin'
   id:
     | '__root__'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
+    | '/api/public/tap-webhook'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -253,6 +265,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiPublicTapWebhookRoute: typeof ApiPublicTapWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -362,6 +375,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/api/public/tap-webhook': {
+      id: '/api/public/tap-webhook'
+      path: '/api/public/tap-webhook'
+      fullPath: '/api/public/tap-webhook'
+      preLoaderRoute: typeof ApiPublicTapWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -452,6 +472,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiPublicTapWebhookRoute: ApiPublicTapWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
