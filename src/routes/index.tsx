@@ -10,7 +10,7 @@ import { tools } from "@/lib/tools";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DocuMind — AI Document & PDF Suite" },
+      { title: "PDF Quanta — The Quantum Leap in Document Intelligence" },
       {
         name: "description",
         content:
