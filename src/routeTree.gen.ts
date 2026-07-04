@@ -25,6 +25,7 @@ import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
+import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminFinancialsRouteImport } from './routes/_authenticated/admin.financials'
@@ -108,6 +109,11 @@ const ApiPublicTapWebhookRoute = ApiPublicTapWebhookRouteImport.update({
   path: '/api/public/tap-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTapRenewRoute = ApiPublicTapRenewRouteImport.update({
+  id: '/api/public/tap-renew',
+  path: '/api/public/tap-renew',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
     | '/admin'
   id:
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
+    | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -265,6 +277,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
   ApiPublicTapWebhookRoute: typeof ApiPublicTapWebhookRoute
 }
 
@@ -382,6 +395,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTapWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/tap-renew': {
+      id: '/api/public/tap-renew'
+      path: '/api/public/tap-renew'
+      fullPath: '/api/public/tap-renew'
+      preLoaderRoute: typeof ApiPublicTapRenewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -472,6 +492,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiPublicTapRenewRoute: ApiPublicTapRenewRoute,
   ApiPublicTapWebhookRoute: ApiPublicTapWebhookRoute,
 }
 export const routeTree = rootRouteImport
