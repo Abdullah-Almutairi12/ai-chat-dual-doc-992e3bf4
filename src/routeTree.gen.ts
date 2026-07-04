@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PaymentMockRouteImport } from './routes/payment.mock'
 import { Route as PaymentCallbackRouteImport } from './routes/payment.callback'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AppTablesRouteImport } from './routes/_app.tables'
@@ -64,6 +65,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentMockRoute = PaymentMockRouteImport.update({
+  id: '/payment/mock',
+  path: '/payment/mock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/tables': typeof AppTablesRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/payment/callback': typeof PaymentCallbackRoute
+  '/payment/mock': typeof PaymentMockRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/payment/mock': typeof PaymentMockRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/_app/tables': typeof AppTablesRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/payment/callback': typeof PaymentCallbackRoute
+  '/payment/mock': typeof PaymentMockRoute
   '/_authenticated/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/tables'
     | '/admin'
     | '/payment/callback'
+    | '/payment/mock'
     | '/admin/documents'
     | '/admin/financials'
     | '/admin/settings'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/tables'
     | '/payment/callback'
+    | '/payment/mock'
     | '/admin/documents'
     | '/admin/financials'
     | '/admin/settings'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/_app/tables'
     | '/_authenticated/admin'
     | '/payment/callback'
+    | '/payment/mock'
     | '/_authenticated/admin/documents'
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
@@ -303,6 +315,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   PaymentCallbackRoute: typeof PaymentCallbackRoute
+  PaymentMockRoute: typeof PaymentMockRoute
   ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
   ApiPublicTapWebhookRoute: typeof ApiPublicTapWebhookRoute
 }
@@ -356,6 +369,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/mock': {
+      id: '/payment/mock'
+      path: '/payment/mock'
+      fullPath: '/payment/mock'
+      preLoaderRoute: typeof PaymentMockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payment/callback': {
@@ -534,6 +554,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   PaymentCallbackRoute: PaymentCallbackRoute,
+  PaymentMockRoute: PaymentMockRoute,
   ApiPublicTapRenewRoute: ApiPublicTapRenewRoute,
   ApiPublicTapWebhookRoute: ApiPublicTapWebhookRoute,
 }
