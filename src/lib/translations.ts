@@ -12,6 +12,7 @@ const en = {
   nav_login: "Login",
   nav_admin: "Admin",
   nav_signup: "Sign up",
+  nav_pricing: "Pricing",
 
   // hero
   hero_badge: "AI-powered · Bilingual",
