@@ -42,8 +42,11 @@ function Landing() {
                 {t("hero_badge")}
               </span>
               <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                {t("hero_title")}
+                {t("brand")}
               </h1>
+              <p className="mt-3 text-xl font-semibold text-primary sm:text-2xl">
+                {t("slogan")}
+              </p>
               <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground lg:mx-0">
                 {t("hero_desc")}
               </p>
