@@ -1,35 +1,62 @@
 export type Lang = "en" | "ar";
 
 const en = {
-  brand: "PDF Chat",
+  brand: "DocuMind",
+  tagline: "AI Document & PDF Suite",
+  lang_toggle: "العربية",
+
   nav_home: "Home",
+  nav_features: "Features",
   nav_dashboard: "Dashboard",
   nav_login: "Login",
   nav_signup: "Sign up",
-  lang_toggle: "العربية",
 
-  hero_title: "Chat with your PDF",
+  // hero
+  hero_badge: "AI-powered · Bilingual",
+  hero_title: "Your intelligent document workspace",
   hero_desc:
-    "Upload any document and get instant summaries, insights, and answers through an intelligent chat interface.",
+    "Chat with PDFs, extract tables, proofread, convert, generate quizzes, and analyze financial or legal documents — all in one bilingual AI suite.",
   hero_cta: "Get Started",
-  hero_secondary: "See how it works",
+  hero_secondary: "Explore features",
 
-  feature_summaries_title: "Instant summaries",
-  feature_summaries_desc: "Condense long documents into clear, concise key points in seconds.",
-  feature_answers_title: "Ask anything",
-  feature_answers_desc: "Get precise answers grounded in the content of your document.",
-  feature_insights_title: "Deeper insights",
-  feature_insights_desc: "Surface trends, definitions, and hidden details you might miss.",
+  features_title: "Six powerful tools, one workspace",
+  features_subtitle: "Everything you need to work smarter with documents.",
 
-  dashboard_title: "Your documents",
-  dashboard_subtitle: "Upload a PDF to start a conversation.",
+  // tool titles
+  tool_chat: "Chat & Summary",
+  tool_tables: "Table & Excel Extractor",
+  tool_proofreader: "Proofreader & Smart Editor",
+  tool_converter: "Smart Document Converter",
+  tool_quiz: "AI Quiz Generator",
+  tool_analyzer: "Financial & Legal Analyzer",
+
+  // tool short descriptions
+  tool_chat_desc: "Ask questions and get instant answers grounded in your PDF.",
+  tool_tables_desc: "Detect tables in any PDF and export them to clean Excel files.",
+  tool_proofreader_desc: "Catch grammar and spelling mistakes in Arabic and English.",
+  tool_converter_desc: "Convert PDF to Word or run OCR on scanned documents.",
+  tool_quiz_desc: "Turn any document into an interactive quiz with instant scoring.",
+  tool_analyzer_desc: "Extract key metrics into charts and flag risky legal clauses.",
+
+  // sidebar
+  sidebar_tools: "Tools",
+  sidebar_library: "Library",
+  history_title: "Recent documents",
+  history_empty: "No documents yet",
+
+  // dashboard
+  dashboard_title: "Dashboard",
+  dashboard_welcome: "Choose a tool to get started.",
+  open_tool: "Open",
+
+  // dropzone
   dropzone_text: "Drag & drop your PDF here, or click to browse",
   dropzone_hint: "PDF files up to 20MB",
-  history_title: "History",
-  history_empty: "No documents yet",
-  open_chat: "Open chat",
-  uploading: "Uploading…",
+  dropzone_replace: "Replace file",
+  invalid_file: "Please upload a valid file",
+  uploaded: "Document uploaded",
 
+  // chat tool
   chat_summary_title: "Document summary",
   chat_summary_body:
     "This document covers the main topics, key arguments, and conclusions. Ask a question to dive deeper into any section.",
@@ -37,15 +64,69 @@ const en = {
   chat_empty_title: "Ask your first question",
   chat_empty_desc: "Try “Summarize this document” or “What are the key takeaways?”",
   chat_send: "Send",
-  chat_thinking: "Thinking…",
-  chat_you: "You",
-  chat_assistant: "Assistant",
-  back: "Back",
 
+  // tables tool
+  tables_detected: "Detected tables",
+  tables_scan: "Scanning document for tables…",
+  tables_download: "Download Excel",
+  tables_downloaded: "Excel file downloaded",
+  tables_hint: "AI found the following tables. Download them as a formatted .xlsx file.",
+
+  // proofreader
+  proof_scan: "Analyzing text…",
+  proof_issues: "Issues found",
+  proof_no_issues: "No issues found",
+  proof_original: "Original text",
+  proof_rewrite: "Professional rewrite",
+  proof_apply: "Apply rewrite",
+  proof_applied: "Rewrite applied",
+  proof_error_spelling: "Spelling",
+  proof_error_grammar: "Grammar",
+  proof_error_style: "Style",
+
+  // converter
+  convert_target: "Convert to",
+  convert_word: "PDF → Word",
+  convert_ocr: "OCR (scanned → text)",
+  convert_run: "Convert now",
+  convert_processing: "Converting…",
+  convert_done: "Conversion complete",
+  convert_download: "Download result",
+  convert_ocr_note: "Optimized for accurate Arabic character recognition.",
+  convert_result_title: "Result preview",
+
+  // quiz
+  quiz_generate: "Generate quiz",
+  quiz_generating: "Generating questions…",
+  quiz_type: "Question type",
+  quiz_mcq: "Multiple choice",
+  quiz_tf: "True / False",
+  quiz_submit: "Submit answers",
+  quiz_retry: "Try again",
+  quiz_score: "Your score",
+  quiz_correct: "Correct",
+  quiz_incorrect: "Incorrect",
+  quiz_true: "True",
+  quiz_false: "False",
+
+  // analyzer
+  analyzer_metrics: "Key metrics",
+  analyzer_chart_title: "Financial overview",
+  analyzer_flags: "Flagged clauses",
+  analyzer_flags_hint: "Sensitive legal clauses and hidden penalties detected.",
+  analyzer_revenue: "Revenue",
+  analyzer_expenses: "Expenses",
+  analyzer_profit: "Net profit",
+  analyzer_debt: "Total debt",
+  analyzer_high: "High risk",
+  analyzer_medium: "Medium risk",
+  analyzer_scan: "Analyzing document…",
+
+  // auth
   login_title: "Welcome back",
-  login_subtitle: "Sign in to continue to your documents.",
+  login_subtitle: "Sign in to continue to your workspace.",
   signup_title: "Create your account",
-  signup_subtitle: "Start chatting with your PDFs in seconds.",
+  signup_subtitle: "Start working smarter with your documents.",
   email: "Email",
   password: "Password",
   name: "Full name",
@@ -53,39 +134,61 @@ const en = {
   signup_action: "Sign up",
   have_account: "Already have an account?",
   no_account: "Don't have an account?",
+  auth_soon: "Authentication coming soon",
 
+  back: "Back",
   footer_rights: "All rights reserved.",
 };
 
 const ar: Record<keyof typeof en, string> = {
-  brand: "دردشة PDF",
+  brand: "ذكاء المستندات",
+  tagline: "منصة المستندات و PDF بالذكاء الاصطناعي",
+  lang_toggle: "English",
+
   nav_home: "الرئيسية",
+  nav_features: "المميزات",
   nav_dashboard: "لوحة التحكم",
   nav_login: "تسجيل الدخول",
   nav_signup: "إنشاء حساب",
-  lang_toggle: "English",
 
-  hero_title: "دردش مع ملفات الـ PDF",
+  hero_badge: "مدعوم بالذكاء الاصطناعي · ثنائي اللغة",
+  hero_title: "مساحة عملك الذكية للمستندات",
   hero_desc:
-    "ارفع أي مستند واحصل على ملخصات وإجابات فورية من خلال واجهة محادثة ذكية.",
+    "دردش مع ملفات PDF، واستخرج الجداول، وصحّح لغويًا، وحوّل الصيغ، وأنشئ الاختبارات، وحلّل المستندات المالية والقانونية — كل ذلك في منصة ذكية واحدة ثنائية اللغة.",
   hero_cta: "ابدأ الآن",
-  hero_secondary: "شاهد كيف يعمل",
+  hero_secondary: "استكشف المميزات",
 
-  feature_summaries_title: "ملخصات فورية",
-  feature_summaries_desc: "لخّص المستندات الطويلة إلى نقاط واضحة ومختصرة في ثوانٍ.",
-  feature_answers_title: "اسأل أي شيء",
-  feature_answers_desc: "احصل على إجابات دقيقة مستندة إلى محتوى مستندك.",
-  feature_insights_title: "رؤى أعمق",
-  feature_insights_desc: "اكتشف الاتجاهات والتعريفات والتفاصيل الخفية التي قد تفوتك.",
+  features_title: "ست أدوات قوية في منصة واحدة",
+  features_subtitle: "كل ما تحتاجه للعمل بذكاء مع مستنداتك.",
 
-  dashboard_title: "مستنداتك",
-  dashboard_subtitle: "ارفع ملف PDF لبدء المحادثة.",
+  tool_chat: "المحادثة والتلخيص",
+  tool_tables: "مستخرج الجداول",
+  tool_proofreader: "المصحح والمراجع اللغوي",
+  tool_converter: "محول الصيغ الذكي",
+  tool_quiz: "منشئ الاختبارات التلقائي",
+  tool_analyzer: "المحلل المالي والقانوني",
+
+  tool_chat_desc: "اطرح الأسئلة واحصل على إجابات فورية مستندة إلى ملفك.",
+  tool_tables_desc: "اكتشف الجداول في أي ملف PDF وصدّرها إلى ملفات Excel نظيفة.",
+  tool_proofreader_desc: "اكتشف الأخطاء النحوية والإملائية بالعربية والإنجليزية.",
+  tool_converter_desc: "حوّل PDF إلى Word أو نفّذ OCR على المستندات الممسوحة.",
+  tool_quiz_desc: "حوّل أي مستند إلى اختبار تفاعلي مع تصحيح فوري.",
+  tool_analyzer_desc: "استخرج المؤشرات في رسوم بيانية وحدّد البنود القانونية الخطرة.",
+
+  sidebar_tools: "الأدوات",
+  sidebar_library: "المكتبة",
+  history_title: "المستندات الأخيرة",
+  history_empty: "لا توجد مستندات بعد",
+
+  dashboard_title: "لوحة التحكم",
+  dashboard_welcome: "اختر أداة للبدء.",
+  open_tool: "افتح",
+
   dropzone_text: "اسحب وأفلت ملف الـ PDF هنا، أو اضغط للتصفح",
   dropzone_hint: "ملفات PDF حتى 20 ميجابايت",
-  history_title: "السجل",
-  history_empty: "لا توجد مستندات بعد",
-  open_chat: "افتح المحادثة",
-  uploading: "جارٍ الرفع…",
+  dropzone_replace: "استبدال الملف",
+  invalid_file: "الرجاء رفع ملف صالح",
+  uploaded: "تم رفع المستند",
 
   chat_summary_title: "ملخص المستند",
   chat_summary_body:
@@ -94,15 +197,63 @@ const ar: Record<keyof typeof en, string> = {
   chat_empty_title: "اطرح سؤالك الأول",
   chat_empty_desc: "جرّب «لخّص هذا المستند» أو «ما هي النقاط الأساسية؟»",
   chat_send: "إرسال",
-  chat_thinking: "يفكّر…",
-  chat_you: "أنت",
-  chat_assistant: "المساعد",
-  back: "رجوع",
+
+  tables_detected: "الجداول المكتشفة",
+  tables_scan: "جارٍ فحص المستند بحثًا عن الجداول…",
+  tables_download: "تنزيل Excel",
+  tables_downloaded: "تم تنزيل ملف Excel",
+  tables_hint: "اكتشف الذكاء الاصطناعي الجداول التالية. نزّلها كملف .xlsx منسّق.",
+
+  proof_scan: "جارٍ تحليل النص…",
+  proof_issues: "الأخطاء المكتشفة",
+  proof_no_issues: "لا توجد أخطاء",
+  proof_original: "النص الأصلي",
+  proof_rewrite: "إعادة صياغة احترافية",
+  proof_apply: "تطبيق الصياغة",
+  proof_applied: "تم تطبيق الصياغة",
+  proof_error_spelling: "إملائي",
+  proof_error_grammar: "نحوي",
+  proof_error_style: "أسلوب",
+
+  convert_target: "التحويل إلى",
+  convert_word: "PDF ← Word",
+  convert_ocr: "OCR (ممسوح ← نص)",
+  convert_run: "حوّل الآن",
+  convert_processing: "جارٍ التحويل…",
+  convert_done: "اكتمل التحويل",
+  convert_download: "تنزيل النتيجة",
+  convert_ocr_note: "محسّن للتعرف الدقيق على الحروف العربية.",
+  convert_result_title: "معاينة النتيجة",
+
+  quiz_generate: "أنشئ الاختبار",
+  quiz_generating: "جارٍ إنشاء الأسئلة…",
+  quiz_type: "نوع الأسئلة",
+  quiz_mcq: "اختيار من متعدد",
+  quiz_tf: "صح / خطأ",
+  quiz_submit: "إرسال الإجابات",
+  quiz_retry: "حاول مجددًا",
+  quiz_score: "نتيجتك",
+  quiz_correct: "صحيح",
+  quiz_incorrect: "خطأ",
+  quiz_true: "صح",
+  quiz_false: "خطأ",
+
+  analyzer_metrics: "المؤشرات الرئيسية",
+  analyzer_chart_title: "نظرة مالية عامة",
+  analyzer_flags: "البنود المحددة",
+  analyzer_flags_hint: "تم اكتشاف بنود قانونية حساسة وغرامات مخفية.",
+  analyzer_revenue: "الإيرادات",
+  analyzer_expenses: "المصروفات",
+  analyzer_profit: "صافي الربح",
+  analyzer_debt: "إجمالي الديون",
+  analyzer_high: "خطورة عالية",
+  analyzer_medium: "خطورة متوسطة",
+  analyzer_scan: "جارٍ تحليل المستند…",
 
   login_title: "مرحبًا بعودتك",
-  login_subtitle: "سجّل الدخول للمتابعة إلى مستنداتك.",
+  login_subtitle: "سجّل الدخول للمتابعة إلى مساحة عملك.",
   signup_title: "أنشئ حسابك",
-  signup_subtitle: "ابدأ الدردشة مع ملفات الـ PDF خلال ثوانٍ.",
+  signup_subtitle: "ابدأ العمل بذكاء مع مستنداتك.",
   email: "البريد الإلكتروني",
   password: "كلمة المرور",
   name: "الاسم الكامل",
@@ -110,13 +261,12 @@ const ar: Record<keyof typeof en, string> = {
   signup_action: "إنشاء حساب",
   have_account: "لديك حساب بالفعل؟",
   no_account: "ليس لديك حساب؟",
+  auth_soon: "المصادقة قريبًا",
 
+  back: "رجوع",
   footer_rights: "جميع الحقوق محفوظة.",
 };
 
 export type TranslationKey = keyof typeof en;
 
-export const translations: Record<Lang, Record<TranslationKey, string>> = {
-  en,
-  ar,
-};
+export const translations: Record<Lang, Record<TranslationKey, string>> = { en, ar };
