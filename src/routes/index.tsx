@@ -118,8 +118,9 @@ function Landing() {
       </main>
 
       <footer className="border-t border-border py-8">
-        <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground sm:px-6">
-          © {new Date().getFullYear()} {t("brand")}. {t("footer_rights")}
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 text-center text-sm text-muted-foreground sm:px-6">
+          <Logo size={30} />
+          <p>© {new Date().getFullYear()} {t("brand")}. {t("footer_rights")}</p>
         </div>
       </footer>
     </div>
