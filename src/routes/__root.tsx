@@ -12,6 +12,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { I18nProvider } from "../lib/i18n";
+import { ThemeProvider } from "../lib/theme";
+import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -79,18 +81,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "PDF Chat — Chat with your PDF" },
+      { title: "PDF Quanta — The Quantum Leap in Document Intelligence" },
       {
         name: "description",
         content:
-          "Upload any PDF and get instant summaries, insights, and answers through an intelligent bilingual chat interface.",
+          "PDF Quanta is a bilingual AI document suite: chat with PDFs, extract tables, proofread, convert, generate quizzes, and analyze financial or legal documents.",
       },
-      { name: "author", content: "PDF Chat" },
-      { property: "og:title", content: "PDF Chat — Chat with your PDF" },
+      { name: "author", content: "PDF Quanta" },
+      { property: "og:title", content: "PDF Quanta — The Quantum Leap in Document Intelligence" },
       {
         property: "og:description",
         content:
-          "Upload any PDF and get instant summaries, insights, and answers through an intelligent bilingual chat interface.",
+          "PDF Quanta is a bilingual AI document suite for chat, tables, proofreading, conversion, quizzes, and financial/legal analysis.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -132,14 +134,26 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      router.invalidate();
+      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+    });
+    return () => data.subscription.unsubscribe();
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <Toaster position="top-center" richColors />
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+          <Toaster position="top-center" richColors />
+        </I18nProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
