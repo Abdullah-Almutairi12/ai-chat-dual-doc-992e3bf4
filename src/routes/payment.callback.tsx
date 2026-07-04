@@ -66,7 +66,7 @@ function PaymentCallback() {
         style={{ background: "var(--gradient-subtle)" }}
       />
       <Dialog open>
-        <DialogContent className="max-w-sm text-center" hideClose>
+        <DialogContent className="max-w-sm text-center">
           {phase === "verifying" && (
             <div className="flex flex-col items-center py-4">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
