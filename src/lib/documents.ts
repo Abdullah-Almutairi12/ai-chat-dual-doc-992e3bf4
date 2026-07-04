@@ -1,18 +1,12 @@
-export type DocMessage = {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-};
-
 export type PdfDocument = {
   id: string;
   name: string;
   sizeKb: number;
   uploadedAt: number;
-  messages: DocMessage[];
+  tool: string;
 };
 
-const STORAGE_KEY = "pdf-assistant-docs";
+const STORAGE_KEY = "documind-docs";
 
 function read(): PdfDocument[] {
   if (typeof window === "undefined") return [];
@@ -27,35 +21,23 @@ function read(): PdfDocument[] {
 function write(docs: PdfDocument[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
-  window.dispatchEvent(new Event("pdf-docs-changed"));
+  window.dispatchEvent(new Event("documind-docs-changed"));
 }
 
 export function getDocuments(): PdfDocument[] {
   return read().sort((a, b) => b.uploadedAt - a.uploadedAt);
 }
 
-export function getDocument(id: string): PdfDocument | undefined {
-  return read().find((d) => d.id === id);
-}
-
-export function addDocument(name: string, sizeKb: number): PdfDocument {
+export function addDocument(name: string, sizeKb: number, tool: string): PdfDocument {
   const doc: PdfDocument = {
     id: crypto.randomUUID(),
     name,
     sizeKb,
     uploadedAt: Date.now(),
-    messages: [],
+    tool,
   };
-  write([...read(), doc]);
+  write([doc, ...read()].slice(0, 30));
   return doc;
-}
-
-export function saveMessages(id: string, messages: DocMessage[]) {
-  const docs = read();
-  const idx = docs.findIndex((d) => d.id === id);
-  if (idx === -1) return;
-  docs[idx] = { ...docs[idx], messages };
-  write(docs);
 }
 
 export function deleteDocument(id: string) {
