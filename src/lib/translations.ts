@@ -155,6 +155,7 @@ const ar: Record<keyof typeof en, string> = {
   nav_login: "تسجيل الدخول",
   nav_admin: "الإدارة",
   nav_signup: "إنشاء حساب",
+  nav_pricing: "الباقات",
 
   hero_badge: "مدعوم بالذكاء الاصطناعي · ثنائي اللغة",
   hero_title: "مساحة عملك الذكية للمستندات",
