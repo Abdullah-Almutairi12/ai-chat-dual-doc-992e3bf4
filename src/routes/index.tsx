@@ -3,6 +3,7 @@ import { ArrowRight, FileText } from "lucide-react";
 
 import heroImage from "@/assets/hero.jpg";
 import { Navbar } from "@/components/Navbar";
+import { Logo, LogoIcon } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
@@ -37,6 +38,9 @@ function Landing() {
           />
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
             <div className="animate-fade-up text-center lg:text-start">
+              <div className="mb-6 flex justify-center lg:justify-start">
+                <LogoIcon size={64} className="drop-shadow-[0_8px_24px_color-mix(in_oklab,var(--primary)_40%,transparent)]" />
+              </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
                 <FileText className="h-3.5 w-3.5 text-primary" />
                 {t("hero_badge")}
