@@ -13,10 +13,31 @@ export const createCheckout = createServerFn({ method: "POST" })
     const origin = data.origin?.startsWith("http") ? data.origin : "";
     if (!origin) throw new Error("Invalid origin");
 
-    const { createTapCharge } = await import("./tap.server");
+    const { createTapCharge, createMockCharge } = await import("./tap.server");
     const email = (context.claims as { email?: string })?.email ?? "";
-    const { url } = await createTapCharge({ userId: context.userId, email, plan, origin });
-    return { url };
+    try {
+      const { url } = await createTapCharge({ userId: context.userId, email, plan, origin });
+      return { url, simulated: false };
+    } catch (err) {
+      // Tap unreachable / invalid key (e.g. placeholder sandbox keys) →
+      // fall back to the built-in simulated checkout so the flow still works.
+      console.error("[createCheckout] Tap failed, using simulated checkout:", err);
+      const { url } = await createMockCharge({ userId: context.userId, plan, origin });
+      return { url, simulated: true };
+    }
+  });
+
+/** Confirm a simulated (mock) payment and apply credits. */
+export const confirmMock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { chargeId: string }) => {
+    if (!data?.chargeId?.startsWith("mock_")) throw new Error("Invalid charge");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { confirmMockPayment } = await import("./tap.server");
+    const email = (context.claims as { email?: string })?.email ?? "";
+    return confirmMockPayment(context.userId, email, data.chargeId);
   });
 
 /** Claim the free plan's credits (once per user). */
