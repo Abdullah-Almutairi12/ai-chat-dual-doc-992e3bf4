@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTablesRouteImport } from './routes/_app.tables'
 import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppConverterRouteImport } from './routes/_app.converter'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -58,6 +59,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConverterRoute = AppConverterRouteImport.update({
+  id: '/converter',
+  path: '/converter',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppChatRoute = AppChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/chat': typeof AppChatRoute
+  '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
   '/proofreader': typeof AppProofreaderRoute
   '/tables': typeof AppTablesRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/chat': typeof AppChatRoute
+  '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
   '/proofreader': typeof AppProofreaderRoute
   '/tables': typeof AppTablesRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/chat': typeof AppChatRoute
+  '/_app/converter': typeof AppConverterRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/proofreader': typeof AppProofreaderRoute
   '/_app/tables': typeof AppTablesRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/sitemap.xml'
     | '/chat'
+    | '/converter'
     | '/dashboard'
     | '/proofreader'
     | '/tables'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/sitemap.xml'
     | '/chat'
+    | '/converter'
     | '/dashboard'
     | '/proofreader'
     | '/tables'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/sitemap.xml'
     | '/_app/chat'
+    | '/_app/converter'
     | '/_app/dashboard'
     | '/_app/proofreader'
     | '/_app/tables'
@@ -196,6 +208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/converter': {
+      id: '/_app/converter'
+      path: '/converter'
+      fullPath: '/converter'
+      preLoaderRoute: typeof AppConverterRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/chat': {
       id: '/_app/chat'
       path: '/chat'
@@ -208,6 +227,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppChatRoute: typeof AppChatRoute
+  AppConverterRoute: typeof AppConverterRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppProofreaderRoute: typeof AppProofreaderRoute
   AppTablesRoute: typeof AppTablesRoute
@@ -215,6 +235,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppChatRoute: AppChatRoute,
+  AppConverterRoute: AppConverterRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppProofreaderRoute: AppProofreaderRoute,
   AppTablesRoute: AppTablesRoute,
