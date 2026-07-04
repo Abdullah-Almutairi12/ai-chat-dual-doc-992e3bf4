@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTablesRouteImport } from './routes/_app.tables'
+import { Route as AppQuizRouteImport } from './routes/_app.quiz'
 import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConverterRouteImport } from './routes/_app.converter'
@@ -49,6 +50,11 @@ const AppTablesRoute = AppTablesRouteImport.update({
   path: '/tables',
   getParentRoute: () => AppRoute,
 } as any)
+const AppQuizRoute = AppQuizRouteImport.update({
+  id: '/quiz',
+  path: '/quiz',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProofreaderRoute = AppProofreaderRouteImport.update({
   id: '/proofreader',
   path: '/proofreader',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
   '/proofreader': typeof AppProofreaderRoute
+  '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
 }
 export interface FileRoutesByTo {
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
   '/proofreader': typeof AppProofreaderRoute
+  '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
 }
 export interface FileRoutesById {
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_app/converter': typeof AppConverterRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/proofreader': typeof AppProofreaderRoute
+  '/_app/quiz': typeof AppQuizRoute
   '/_app/tables': typeof AppTablesRoute
 }
 export interface FileRouteTypes {
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/converter'
     | '/dashboard'
     | '/proofreader'
+    | '/quiz'
     | '/tables'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/converter'
     | '/dashboard'
     | '/proofreader'
+    | '/quiz'
     | '/tables'
   id:
     | '__root__'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_app/converter'
     | '/_app/dashboard'
     | '/_app/proofreader'
+    | '/_app/quiz'
     | '/_app/tables'
   fileRoutesById: FileRoutesById
 }
@@ -194,6 +206,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTablesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/quiz': {
+      id: '/_app/quiz'
+      path: '/quiz'
+      fullPath: '/quiz'
+      preLoaderRoute: typeof AppQuizRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/proofreader': {
       id: '/_app/proofreader'
       path: '/proofreader'
@@ -230,6 +249,7 @@ interface AppRouteChildren {
   AppConverterRoute: typeof AppConverterRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppProofreaderRoute: typeof AppProofreaderRoute
+  AppQuizRoute: typeof AppQuizRoute
   AppTablesRoute: typeof AppTablesRoute
 }
 
@@ -238,6 +258,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConverterRoute: AppConverterRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppProofreaderRoute: AppProofreaderRoute,
+  AppQuizRoute: AppQuizRoute,
   AppTablesRoute: AppTablesRoute,
 }
 
