@@ -120,7 +120,7 @@ export const updateUser = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; tier?: string; credits?: number; banned?: boolean }) => data)
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
-    const patch: Record<string, unknown> = {};
+    const patch: { tier?: string; credits?: number; banned?: boolean } = {};
     if (data.tier !== undefined) patch.tier = data.tier;
     if (data.credits !== undefined) patch.credits = data.credits;
     if (data.banned !== undefined) patch.banned = data.banned;
