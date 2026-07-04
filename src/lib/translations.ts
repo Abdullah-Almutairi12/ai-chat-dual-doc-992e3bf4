@@ -1,8 +1,9 @@
 export type Lang = "en" | "ar";
 
 const en = {
-  brand: "DocuMind",
-  tagline: "AI Document & PDF Suite",
+  brand: "PDF Quanta",
+  tagline: "The Quantum Leap in Document Intelligence",
+  slogan: "The Quantum Leap in Document Intelligence",
   lang_toggle: "العربية",
 
   nav_home: "Home",
@@ -141,8 +142,9 @@ const en = {
 };
 
 const ar: Record<keyof typeof en, string> = {
-  brand: "ذكاء المستندات",
-  tagline: "منصة المستندات و PDF بالذكاء الاصطناعي",
+  brand: "PDF Quanta",
+  tagline: "القفزة النوعية في ذكاء المستندات",
+  slogan: "القفزة النوعية في ذكاء المستندات",
   lang_toggle: "English",
 
   nav_home: "الرئيسية",
