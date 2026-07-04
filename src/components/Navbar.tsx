@@ -25,6 +25,12 @@ export function Navbar() {
           >
             {t("nav_dashboard")}
           </Link>
+          <Link
+            to="/pricing"
+            className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {t("nav_pricing")}
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">
