@@ -44,12 +44,43 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_intents: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          plan_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id: string
+          plan_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          plan_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           banned: boolean
           created_at: string
           credits: number
           email: string
+          free_claimed: boolean
           id: string
           name: string
           tier: string
@@ -61,6 +92,7 @@ export type Database = {
           created_at?: string
           credits?: number
           email: string
+          free_claimed?: boolean
           id?: string
           name?: string
           tier?: string
@@ -72,11 +104,60 @@ export type Database = {
           created_at?: string
           credits?: number
           email?: string
+          free_claimed?: boolean
           id?: string
           name?: string
           tier?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          created_at: string
+          credits_per_cycle: number
+          currency: string
+          current_period_end: string | null
+          id: string
+          last_charge_id: string | null
+          plan_id: string
+          status: string
+          tap_card_id: string | null
+          tap_customer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          credits_per_cycle?: number
+          currency?: string
+          current_period_end?: string | null
+          id?: string
+          last_charge_id?: string | null
+          plan_id: string
+          status?: string
+          tap_card_id?: string | null
+          tap_customer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits_per_cycle?: number
+          currency?: string
+          current_period_end?: string | null
+          id?: string
+          last_charge_id?: string | null
+          plan_id?: string
+          status?: string
+          tap_card_id?: string | null
+          tap_customer_id?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -105,9 +186,12 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          credits: number
           currency: string
           id: string
           invoice_id: string
+          kind: string
+          plan_id: string | null
           status: string
           user_email: string
           user_id: string | null
@@ -115,9 +199,12 @@ export type Database = {
         Insert: {
           amount?: number
           created_at?: string
+          credits?: number
           currency?: string
           id?: string
           invoice_id: string
+          kind?: string
+          plan_id?: string | null
           status?: string
           user_email: string
           user_id?: string | null
@@ -125,9 +212,12 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          credits?: number
           currency?: string
           id?: string
           invoice_id?: string
+          kind?: string
+          plan_id?: string | null
           status?: string
           user_email?: string
           user_id?: string | null
@@ -160,7 +250,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      add_credits: {
+        Args: { _amount: number; _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"

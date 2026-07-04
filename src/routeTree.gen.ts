@@ -11,10 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PaymentMockRouteImport } from './routes/payment.mock'
+import { Route as PaymentCallbackRouteImport } from './routes/payment.callback'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AppTablesRouteImport } from './routes/_app.tables'
 import { Route as AppQuizRouteImport } from './routes/_app.quiz'
@@ -24,6 +27,8 @@ import { Route as AppConverterRouteImport } from './routes/_app.converter'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
+import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminFinancialsRouteImport } from './routes/_authenticated/admin.financials'
@@ -37,6 +42,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -55,6 +65,16 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentMockRoute = PaymentMockRouteImport.update({
+  id: '/payment/mock',
+  path: '/payment/mock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
+  id: '/payment/callback',
+  path: '/payment/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -102,6 +122,16 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const ApiPublicTapWebhookRoute = ApiPublicTapWebhookRouteImport.update({
+  id: '/api/public/tap-webhook',
+  path: '/api/public/tap-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTapRenewRoute = ApiPublicTapRenewRouteImport.update({
+  id: '/api/public/tap-renew',
+  path: '/api/public/tap-renew',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -129,6 +159,7 @@ const AuthenticatedAdminDocumentsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/analyzer': typeof AppAnalyzerRoute
@@ -139,15 +170,20 @@ export interface FileRoutesByFullPath {
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/payment/callback': typeof PaymentCallbackRoute
+  '/payment/mock': typeof PaymentMockRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
+  '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/analyzer': typeof AppAnalyzerRoute
@@ -157,10 +193,14 @@ export interface FileRoutesByTo {
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
+  '/payment/callback': typeof PaymentCallbackRoute
+  '/payment/mock': typeof PaymentMockRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
+  '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -169,6 +209,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/analyzer': typeof AppAnalyzerRoute
@@ -179,10 +220,14 @@ export interface FileRoutesById {
   '/_app/quiz': typeof AppQuizRoute
   '/_app/tables': typeof AppTablesRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/payment/callback': typeof PaymentCallbackRoute
+  '/payment/mock': typeof PaymentMockRoute
   '/_authenticated/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
+  '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -190,6 +235,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/pricing'
     | '/signup'
     | '/sitemap.xml'
     | '/analyzer'
@@ -200,15 +246,20 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/tables'
     | '/admin'
+    | '/payment/callback'
+    | '/payment/mock'
     | '/admin/documents'
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/tap-renew'
+    | '/api/public/tap-webhook'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/pricing'
     | '/signup'
     | '/sitemap.xml'
     | '/analyzer'
@@ -218,10 +269,14 @@ export interface FileRouteTypes {
     | '/proofreader'
     | '/quiz'
     | '/tables'
+    | '/payment/callback'
+    | '/payment/mock'
     | '/admin/documents'
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/tap-renew'
+    | '/api/public/tap-webhook'
     | '/admin'
   id:
     | '__root__'
@@ -229,6 +284,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_app'
     | '/login'
+    | '/pricing'
     | '/signup'
     | '/sitemap.xml'
     | '/_app/analyzer'
@@ -239,10 +295,14 @@ export interface FileRouteTypes {
     | '/_app/quiz'
     | '/_app/tables'
     | '/_authenticated/admin'
+    | '/payment/callback'
+    | '/payment/mock'
     | '/_authenticated/admin/documents'
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
+    | '/api/public/tap-renew'
+    | '/api/public/tap-webhook'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -251,8 +311,13 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  PaymentCallbackRoute: typeof PaymentCallbackRoute
+  PaymentMockRoute: typeof PaymentMockRoute
+  ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
+  ApiPublicTapWebhookRoute: typeof ApiPublicTapWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -269,6 +334,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -297,6 +369,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/mock': {
+      id: '/payment/mock'
+      path: '/payment/mock'
+      fullPath: '/payment/mock'
+      preLoaderRoute: typeof PaymentMockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/callback': {
+      id: '/payment/callback'
+      path: '/payment/callback'
+      fullPath: '/payment/callback'
+      preLoaderRoute: typeof PaymentCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -361,6 +447,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/tap-webhook': {
+      id: '/api/public/tap-webhook'
+      path: '/api/public/tap-webhook'
+      fullPath: '/api/public/tap-webhook'
+      preLoaderRoute: typeof ApiPublicTapWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tap-renew': {
+      id: '/api/public/tap-renew'
+      path: '/api/public/tap-renew'
+      fullPath: '/api/public/tap-renew'
+      preLoaderRoute: typeof ApiPublicTapRenewRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
@@ -450,9 +550,24 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  PaymentCallbackRoute: PaymentCallbackRoute,
+  PaymentMockRoute: PaymentMockRoute,
+  ApiPublicTapRenewRoute: ApiPublicTapRenewRoute,
+  ApiPublicTapWebhookRoute: ApiPublicTapWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
