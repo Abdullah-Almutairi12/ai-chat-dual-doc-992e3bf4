@@ -83,77 +83,176 @@ export type FulfillResult = {
 };
 
 /**
- * Idempotently fulfill a captured charge: record the transaction, add credits,
- * and upsert the subscription. Safe to call from both the webhook and the
- * client callback — the unique invoice_id guarantees credits are added once.
+ * Idempotently record a captured charge: transaction + credits + subscription.
+ * The unique invoice_id guarantees credits are added exactly once per charge.
  */
-export async function fulfillCharge(chargeId: string): Promise<FulfillResult> {
-  const charge = await retrieveCharge(chargeId);
-  const status: string = charge?.status ?? "UNKNOWN";
-  const meta = charge?.metadata ?? {};
-  const userId: string | undefined = meta.user_id;
-  const planId: string | undefined = meta.plan_id;
-  const plan = planId ? getPlan(planId) : undefined;
-
-  if (status !== "CAPTURED" || !userId || !plan) {
-    return { status, fulfilled: false, planId };
-  }
+async function fulfillFromMeta(args: {
+  chargeId: string;
+  userId: string;
+  planId: string;
+  email: string;
+  amount: number;
+  currency: string;
+  kind: string;
+  customerId?: string | null;
+  cardId?: string | null;
+}): Promise<FulfillResult> {
+  const plan = getPlan(args.planId);
+  if (!plan) return { status: "CAPTURED", fulfilled: false, planId: args.planId };
 
   const result: FulfillResult = {
-    status,
+    status: "CAPTURED",
     fulfilled: false,
     credits: plan.credits,
     planId: plan.id,
     planNameEn: plan.nameEn,
     planNameAr: plan.nameAr,
-    amount: Number(charge.amount),
-    currency: charge.currency ?? CURRENCY,
+    amount: args.amount || plan.price,
+    currency: args.currency || CURRENCY,
   };
 
-  const email = charge?.customer?.email ?? charge?.receipt?.email ?? "unknown@pdfquanta.app";
-
   const { error: insErr } = await supabaseAdmin.from("transactions").insert({
-    user_id: userId,
-    invoice_id: chargeId,
-    user_email: typeof email === "string" ? email : "unknown@pdfquanta.app",
-    amount: Number(charge.amount) || plan.price,
-    currency: charge.currency ?? CURRENCY,
+    user_id: args.userId,
+    invoice_id: args.chargeId,
+    user_email: args.email || "unknown@pdfquanta.app",
+    amount: args.amount || plan.price,
+    currency: args.currency || CURRENCY,
     status: "succeeded",
     credits: plan.credits,
     plan_id: plan.id,
-    kind: meta.kind === "renewal" ? "renewal" : "purchase",
+    kind: args.kind === "renewal" ? "renewal" : "purchase",
   });
 
   if (insErr) {
     // 23505 = already recorded → already fulfilled, do not double-credit.
-    if ((insErr as any).code === "23505") {
+    if ((insErr as { code?: string }).code === "23505") {
       return { ...result, fulfilled: false, already: true };
     }
     throw insErr;
   }
 
-  await supabaseAdmin.rpc("add_credits", { _user_id: userId, _amount: plan.credits });
+  await supabaseAdmin.rpc("add_credits", { _user_id: args.userId, _amount: plan.credits });
 
   const periodEnd = new Date(Date.now() + BILLING_INTERVAL_DAYS * 86_400_000).toISOString();
   await supabaseAdmin.from("subscriptions").upsert(
     {
-      user_id: userId,
+      user_id: args.userId,
       plan_id: plan.id,
       status: "active",
       amount: plan.price,
       currency: CURRENCY,
       credits_per_cycle: plan.credits,
-      tap_customer_id: charge?.customer?.id ?? null,
-      tap_card_id: charge?.card?.id ?? null,
-      last_charge_id: chargeId,
+      tap_customer_id: args.customerId ?? null,
+      tap_card_id: args.cardId ?? null,
+      last_charge_id: args.chargeId,
       current_period_end: periodEnd,
     },
     { onConflict: "user_id,plan_id" },
   );
 
-  await supabaseAdmin.from("profiles").update({ tier: plan.id }).eq("user_id", userId);
+  await supabaseAdmin.from("profiles").update({ tier: plan.id }).eq("user_id", args.userId);
 
   return { ...result, fulfilled: true };
+}
+
+/**
+ * Verify + fulfill a charge. Handles both real Tap charges and the built-in
+ * simulated ("mock_") charges. Safe to call from the webhook and the callback.
+ */
+export async function fulfillCharge(chargeId: string): Promise<FulfillResult> {
+  // Simulated checkout: credits are applied at confirmation time; here we just
+  // report the outcome based on the stored intent.
+  if (chargeId.startsWith("mock_")) {
+    const { data: intent } = await supabaseAdmin
+      .from("payment_intents")
+      .select("plan_id,status,amount,currency")
+      .eq("id", chargeId)
+      .maybeSingle();
+    const plan = intent ? getPlan(intent.plan_id) : undefined;
+    if (!intent || !plan || intent.status !== "captured") {
+      return { status: "PENDING", fulfilled: false, planId: intent?.plan_id };
+    }
+    return {
+      status: "CAPTURED",
+      fulfilled: false,
+      already: true,
+      credits: plan.credits,
+      planId: plan.id,
+      planNameEn: plan.nameEn,
+      planNameAr: plan.nameAr,
+      amount: Number(intent.amount),
+      currency: intent.currency ?? CURRENCY,
+    };
+  }
+
+  const charge = await retrieveCharge(chargeId);
+  const status: string = charge?.status ?? "UNKNOWN";
+  const meta = charge?.metadata ?? {};
+  const userId: string | undefined = meta.user_id;
+  const planId: string | undefined = meta.plan_id;
+
+  if (status !== "CAPTURED" || !userId || !planId) {
+    return { status, fulfilled: false, planId };
+  }
+
+  const email = charge?.customer?.email ?? "unknown@pdfquanta.app";
+  return fulfillFromMeta({
+    chargeId,
+    userId,
+    planId,
+    email: typeof email === "string" ? email : "unknown@pdfquanta.app",
+    amount: Number(charge.amount),
+    currency: charge.currency ?? CURRENCY,
+    kind: meta.kind === "renewal" ? "renewal" : "purchase",
+    customerId: charge?.customer?.id ?? null,
+    cardId: charge?.card?.id ?? null,
+  });
+}
+
+/** Create a simulated checkout intent and return the internal mock-pay URL. */
+export async function createMockCharge(opts: {
+  userId: string;
+  plan: Plan;
+  origin: string;
+}): Promise<{ url: string; chargeId: string }> {
+  const chargeId = `mock_${crypto.randomUUID()}`;
+  const { error } = await supabaseAdmin.from("payment_intents").insert({
+    id: chargeId,
+    user_id: opts.userId,
+    plan_id: opts.plan.id,
+    amount: opts.plan.price,
+    currency: CURRENCY,
+    status: "pending",
+  });
+  if (error) throw error;
+  return { url: `${opts.origin}/payment/mock?cid=${chargeId}`, chargeId };
+}
+
+/** Confirm a simulated payment for the owning user and apply credits. */
+export async function confirmMockPayment(
+  userId: string,
+  email: string,
+  chargeId: string,
+): Promise<FulfillResult> {
+  if (!chargeId.startsWith("mock_")) throw new Error("Invalid simulated charge");
+  const { data: intent } = await supabaseAdmin
+    .from("payment_intents")
+    .select("user_id,plan_id,amount,currency,status")
+    .eq("id", chargeId)
+    .maybeSingle();
+  if (!intent || intent.user_id !== userId) throw new Error("Charge not found");
+
+  await supabaseAdmin.from("payment_intents").update({ status: "captured" }).eq("id", chargeId);
+
+  return fulfillFromMeta({
+    chargeId,
+    userId,
+    planId: intent.plan_id,
+    email,
+    amount: Number(intent.amount),
+    currency: intent.currency ?? CURRENCY,
+    kind: "purchase",
+  });
 }
 
 /** Grant the free plan credits once per user. */
