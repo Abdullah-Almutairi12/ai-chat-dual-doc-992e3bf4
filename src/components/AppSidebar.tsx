@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { FileText, LayoutDashboard, LogIn, Trash2 } from "lucide-react";
+import { FileText, LayoutDashboard, LogIn, Shield, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,12 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
+        <Button asChild variant="ghost" size="sm" className="mb-1 w-full justify-start gap-2 text-sidebar-foreground/70">
+          <Link to="/admin" onClick={onNavigate}>
+            <Shield className="h-4 w-4" />
+            {t("nav_admin")}
+          </Link>
+        </Button>
         <Button asChild variant="outline" size="sm" className="w-full gap-2">
           <Link to="/login" onClick={onNavigate}>
             <LogIn className="h-4 w-4" />
