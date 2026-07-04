@@ -12,9 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ChatDocIdRouteImport } from './routes/chat.$docId'
+import { Route as AppTablesRouteImport } from './routes/_app.tables'
+import { Route as AppQuizRouteImport } from './routes/_app.quiz'
+import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppConverterRouteImport } from './routes/_app.converter'
+import { Route as AppChatRouteImport } from './routes/_app.chat'
+import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -31,9 +37,8 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -41,71 +46,132 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChatDocIdRoute = ChatDocIdRouteImport.update({
-  id: '/chat/$docId',
-  path: '/chat/$docId',
-  getParentRoute: () => rootRouteImport,
+const AppTablesRoute = AppTablesRouteImport.update({
+  id: '/tables',
+  path: '/tables',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppQuizRoute = AppQuizRouteImport.update({
+  id: '/quiz',
+  path: '/quiz',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProofreaderRoute = AppProofreaderRouteImport.update({
+  id: '/proofreader',
+  path: '/proofreader',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConverterRoute = AppConverterRouteImport.update({
+  id: '/converter',
+  path: '/converter',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChatRoute = AppChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyzerRoute = AppAnalyzerRouteImport.update({
+  id: '/analyzer',
+  path: '/analyzer',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/chat/$docId': typeof ChatDocIdRoute
+  '/analyzer': typeof AppAnalyzerRoute
+  '/chat': typeof AppChatRoute
+  '/converter': typeof AppConverterRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/proofreader': typeof AppProofreaderRoute
+  '/quiz': typeof AppQuizRoute
+  '/tables': typeof AppTablesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/chat/$docId': typeof ChatDocIdRoute
+  '/analyzer': typeof AppAnalyzerRoute
+  '/chat': typeof AppChatRoute
+  '/converter': typeof AppConverterRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/proofreader': typeof AppProofreaderRoute
+  '/quiz': typeof AppQuizRoute
+  '/tables': typeof AppTablesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/chat/$docId': typeof ChatDocIdRoute
+  '/_app/analyzer': typeof AppAnalyzerRoute
+  '/_app/chat': typeof AppChatRoute
+  '/_app/converter': typeof AppConverterRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/proofreader': typeof AppProofreaderRoute
+  '/_app/quiz': typeof AppQuizRoute
+  '/_app/tables': typeof AppTablesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/dashboard'
     | '/login'
     | '/signup'
     | '/sitemap.xml'
-    | '/chat/$docId'
+    | '/analyzer'
+    | '/chat'
+    | '/converter'
+    | '/dashboard'
+    | '/proofreader'
+    | '/quiz'
+    | '/tables'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/dashboard'
     | '/login'
     | '/signup'
     | '/sitemap.xml'
-    | '/chat/$docId'
+    | '/analyzer'
+    | '/chat'
+    | '/converter'
+    | '/dashboard'
+    | '/proofreader'
+    | '/quiz'
+    | '/tables'
   id:
     | '__root__'
     | '/'
-    | '/dashboard'
+    | '/_app'
     | '/login'
     | '/signup'
     | '/sitemap.xml'
-    | '/chat/$docId'
+    | '/_app/analyzer'
+    | '/_app/chat'
+    | '/_app/converter'
+    | '/_app/dashboard'
+    | '/_app/proofreader'
+    | '/_app/quiz'
+    | '/_app/tables'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  ChatDocIdRoute: typeof ChatDocIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -131,11 +197,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -145,23 +211,86 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/chat/$docId': {
-      id: '/chat/$docId'
-      path: '/chat/$docId'
-      fullPath: '/chat/$docId'
-      preLoaderRoute: typeof ChatDocIdRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/tables': {
+      id: '/_app/tables'
+      path: '/tables'
+      fullPath: '/tables'
+      preLoaderRoute: typeof AppTablesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/quiz': {
+      id: '/_app/quiz'
+      path: '/quiz'
+      fullPath: '/quiz'
+      preLoaderRoute: typeof AppQuizRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/proofreader': {
+      id: '/_app/proofreader'
+      path: '/proofreader'
+      fullPath: '/proofreader'
+      preLoaderRoute: typeof AppProofreaderRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/converter': {
+      id: '/_app/converter'
+      path: '/converter'
+      fullPath: '/converter'
+      preLoaderRoute: typeof AppConverterRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/chat': {
+      id: '/_app/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof AppChatRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/analyzer': {
+      id: '/_app/analyzer'
+      path: '/analyzer'
+      fullPath: '/analyzer'
+      preLoaderRoute: typeof AppAnalyzerRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppAnalyzerRoute: typeof AppAnalyzerRoute
+  AppChatRoute: typeof AppChatRoute
+  AppConverterRoute: typeof AppConverterRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppProofreaderRoute: typeof AppProofreaderRoute
+  AppQuizRoute: typeof AppQuizRoute
+  AppTablesRoute: typeof AppTablesRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAnalyzerRoute: AppAnalyzerRoute,
+  AppChatRoute: AppChatRoute,
+  AppConverterRoute: AppConverterRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppProofreaderRoute: AppProofreaderRoute,
+  AppQuizRoute: AppQuizRoute,
+  AppTablesRoute: AppTablesRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  ChatDocIdRoute: ChatDocIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -10,26 +10,20 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2 font-semibold">
-          <span className="grid h-9 w-9 place-items-center rounded-xl gradient-hero text-primary-foreground shadow-soft">
+        <Link to="/" className="flex min-w-0 items-center gap-2 font-semibold">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-hero text-primary-foreground shadow-soft">
             <FileText className="h-5 w-5" />
           </span>
-          <span className="text-lg tracking-tight">{t("brand")}</span>
+          <span className="truncate text-lg tracking-tight">{t("brand")}</span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          <Link
-            to="/"
-            className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            activeProps={{ className: "text-foreground" }}
-            activeOptions={{ exact: true }}
-          >
-            {t("nav_home")}
-          </Link>
+          <a href="#features" className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+            {t("nav_features")}
+          </a>
           <Link
             to="/dashboard"
             className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            activeProps={{ className: "text-foreground" }}
           >
             {t("nav_dashboard")}
           </Link>

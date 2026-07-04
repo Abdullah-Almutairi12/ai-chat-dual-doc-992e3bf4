@@ -1,37 +1,29 @@
-import { Link } from "@tanstack/react-router";
-import { createFileRoute } from "@tanstack/react-router";
-import { ArrowRight, FileText, MessageSquareText, Sparkles, Search } from "lucide-react";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import { ArrowRight, FileText } from "lucide-react";
 
 import heroImage from "@/assets/hero.jpg";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { tools } from "@/lib/tools";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "DocuMind — AI Document & PDF Suite" },
+      {
+        name: "description",
+        content:
+          "Chat with PDFs, extract tables to Excel, proofread, convert, generate quizzes, and analyze financial or legal documents in one bilingual AI suite.",
+      },
+    ],
+  }),
   component: Landing,
 });
 
 function Landing() {
   const { t, dir } = useI18n();
-  const Arrow = dir === "rtl" ? "rotate-180" : "";
-
-  const features = [
-    {
-      icon: Sparkles,
-      title: t("feature_summaries_title"),
-      desc: t("feature_summaries_desc"),
-    },
-    {
-      icon: MessageSquareText,
-      title: t("feature_answers_title"),
-      desc: t("feature_answers_desc"),
-    },
-    {
-      icon: Search,
-      title: t("feature_insights_title"),
-      desc: t("feature_insights_desc"),
-    },
-  ];
+  const arrow = dir === "rtl" ? "rotate-180" : "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,7 +39,7 @@ function Landing() {
             <div className="animate-fade-up text-center lg:text-start">
               <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
                 <FileText className="h-3.5 w-3.5 text-primary" />
-                AI · PDF
+                {t("hero_badge")}
               </span>
               <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 {t("hero_title")}
@@ -59,11 +51,11 @@ function Landing() {
                 <Button asChild size="lg" className="group gap-2 shadow-elegant">
                   <Link to="/dashboard">
                     {t("hero_cta")}
-                    <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-0.5 ${Arrow}`} />
+                    <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-0.5 ${arrow}`} />
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg">
-                  <Link to="/dashboard">{t("hero_secondary")}</Link>
+                  <a href="#features">{t("hero_secondary")}</a>
                 </Button>
               </div>
             </div>
@@ -82,20 +74,38 @@ function Landing() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:py-20">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="rounded-2xl border border-border bg-card p-6 shadow-soft transition-transform duration-300 hover:-translate-y-1"
+        <section id="features" className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              {t("features_title")}
+            </h2>
+            <p className="mt-3 text-muted-foreground">{t("features_subtitle")}</p>
+          </div>
+
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {tools.map((tool, i) => (
+              <Link
+                key={tool.id}
+                to={tool.path}
+                className="group rounded-2xl border border-border bg-card p-6 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-elegant animate-fade-up"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-primary">
-                  <f.icon className="h-5 w-5" />
+                <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary transition-colors group-hover:gradient-hero group-hover:text-primary-foreground">
+                  <tool.icon className="h-6 w-6" />
                 </span>
-                <h3 className="mt-4 text-lg font-semibold text-foreground">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
-              </div>
+                <h3 className="mt-4 text-lg font-semibold text-foreground">{t(tool.titleKey)}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t(tool.descKey)}</p>
+              </Link>
             ))}
+          </div>
+
+          <div className="mt-14 text-center">
+            <Button asChild size="lg" className="group gap-2 shadow-elegant">
+              <Link to="/dashboard">
+                {t("hero_cta")}
+                <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-0.5 ${arrow}`} />
+              </Link>
+            </Button>
           </div>
         </section>
       </main>
