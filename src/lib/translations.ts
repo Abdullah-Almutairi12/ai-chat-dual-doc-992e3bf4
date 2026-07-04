@@ -142,8 +142,9 @@ const en = {
 };
 
 const ar: Record<keyof typeof en, string> = {
-  brand: "ذكاء المستندات",
-  tagline: "منصة المستندات و PDF بالذكاء الاصطناعي",
+  brand: "PDF Quanta",
+  tagline: "القفزة النوعية في ذكاء المستندات",
+  slogan: "القفزة النوعية في ذكاء المستندات",
   lang_toggle: "English",
 
   nav_home: "الرئيسية",
