@@ -1,8 +1,9 @@
 export type Lang = "en" | "ar";
 
 const en = {
-  brand: "DocuMind",
-  tagline: "AI Document & PDF Suite",
+  brand: "PDF Quanta",
+  tagline: "The Quantum Leap in Document Intelligence",
+  slogan: "The Quantum Leap in Document Intelligence",
   lang_toggle: "العربية",
 
   nav_home: "Home",
