@@ -1,29 +1,84 @@
 import { useRef, useState } from "react";
-import { FileText, UploadCloud } from "lucide-react";
+import { FileText, Loader2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { useI18n } from "@/lib/i18n";
 import { addDocument } from "@/lib/documents";
+import { extractDocument, type ExtractProgress } from "@/lib/pdf-extract";
+import { useActiveDocument, type ActiveDocument } from "@/lib/active-document";
 
 type Props = {
   tool: string;
   onFile: (file: File) => void;
+  /** Called with the fully-extracted document (text + OCR metadata). */
+  onExtracted?: (doc: ActiveDocument) => void;
   accept?: string;
   fileName?: string | null;
 };
 
-export function FileDropzone({ tool, onFile, accept = "application/pdf,.pdf", fileName }: Props) {
+export function FileDropzone({
+  tool,
+  onFile,
+  onExtracted,
+  accept = "application/pdf,.pdf,image/*",
+  fileName,
+}: Props) {
   const { t } = useI18n();
+  const { setDoc } = useActiveDocument();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState<ExtractProgress | null>(null);
 
-  const handle = (files: FileList | null) => {
+  const handle = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    addDocument(file.name, Math.round(file.size / 1024), tool);
-    toast.success(t("uploaded"));
-    onFile(file);
+    setProgress({ stage: "loading", page: 0, pageCount: 0, percent: 0 });
+    try {
+      const result = await extractDocument(file, setProgress);
+      const doc: ActiveDocument = {
+        ...result,
+        name: file.name,
+        sizeKb: Math.round(file.size / 1024),
+      };
+      addDocument(file.name, doc.sizeKb, tool);
+      setDoc(doc);
+      onExtracted?.(doc);
+      if (!result.text) {
+        toast.warning(t("extract_empty"));
+      } else {
+        toast.success(t("uploaded"));
+      }
+      onFile(file);
+    } catch (err) {
+      console.error("[FileDropzone] extraction failed", err);
+      toast.error(t("extract_failed"));
+    } finally {
+      setProgress(null);
+    }
   };
+
+  if (progress) {
+    const label = progress.stage === "ocr" ? t("ocr_running") : t("extracting");
+    return (
+      <div className="flex min-h-[280px] flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/40 bg-card p-10 text-center shadow-soft">
+        <span className="grid h-20 w-20 place-items-center rounded-2xl gradient-hero text-primary-foreground shadow-soft">
+          <Loader2 className="h-9 w-9 animate-spin" />
+        </span>
+        <p className="mt-6 text-lg font-medium text-foreground">{label}</p>
+        {progress.pageCount > 0 && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {progress.page} / {progress.pageCount} {t("pages_label")}
+          </p>
+        )}
+        <div className="mt-5 h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-300"
+            style={{ width: `${Math.max(4, progress.percent)}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (fileName) {
     return (

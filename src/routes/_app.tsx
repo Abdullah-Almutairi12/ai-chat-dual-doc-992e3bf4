@@ -6,6 +6,7 @@ import { AppSidebarContent } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useI18n } from "@/lib/i18n";
+import { ActiveDocumentProvider } from "@/lib/active-document";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -17,6 +18,7 @@ function AppLayout() {
   const side = dir === "rtl" ? "right" : "left";
 
   return (
+    <ActiveDocumentProvider>
     <div className="flex min-h-screen w-full bg-background">
       {/* Desktop sidebar */}
       <aside className="hidden w-72 shrink-0 border-e border-sidebar-border lg:block">
@@ -60,5 +62,6 @@ function AppLayout() {
         </main>
       </div>
     </div>
+    </ActiveDocumentProvider>
   );
 }
