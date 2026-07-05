@@ -42,8 +42,15 @@ function AppLayout() {
             <span className="text-sm font-medium text-muted-foreground">{t("tagline")}</span>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={toggleLang} className="gap-1.5">
-            <Languages className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleLang}
+            className="gap-1.5"
+            aria-label={`Switch language to ${t("lang_toggle")}`}
+            title={t("lang_toggle")}
+          >
+            <Languages className="h-4 w-4" aria-hidden="true" />
             <span>{t("lang_toggle")}</span>
           </Button>
         </header>

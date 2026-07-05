@@ -34,8 +34,15 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={toggleLang} className="gap-1.5">
-            <Languages className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleLang}
+            className="gap-1.5"
+            aria-label={`Switch language to ${t("lang_toggle")}`}
+            title={t("lang_toggle")}
+          >
+            <Languages className="h-4 w-4" aria-hidden="true" />
             <span>{t("lang_toggle")}</span>
           </Button>
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
