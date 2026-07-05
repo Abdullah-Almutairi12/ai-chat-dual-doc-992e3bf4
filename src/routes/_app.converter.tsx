@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/seo";
 import { useActiveDocument } from "@/lib/active-document";
-import { extractLayout, layoutToHtml, type LayoutProgress } from "@/lib/pdf-layout";
-import { pdfToDocx, pdfToHtml } from "@/lib/pdf/convert";
+import { extractLayout, type LayoutProgress } from "@/lib/pdf-layout";
 import { downloadBlob } from "@/lib/pdf/security";
 
 export const Route = createFileRoute("/_app/converter")({
+  ssr: false,
   head: () =>
     pageHead({
       path: "/converter",
@@ -50,6 +50,7 @@ function ConverterTool() {
     setDone(false);
     setResultBlob(null);
     try {
+      const { pdfToDocx } = await import("@/lib/pdf/convert");
       const blob = await pdfToDocx(file, (p) => setProgress({ percent: p.percent, stage: p.stage }));
       setResultBlob(blob);
       setResultExt("docx");
@@ -68,6 +69,7 @@ function ConverterTool() {
     if (!file) return;
     setProcessing(true);
     try {
+      const { pdfToHtml } = await import("@/lib/pdf/convert");
       const blob = await pdfToHtml(file, (p) => setProgress({ percent: p.percent, stage: p.stage }));
       setResultBlob(blob);
       setResultExt("html");
@@ -91,6 +93,7 @@ function ConverterTool() {
     setLayoutProgress({ stage: "loading", page: 0, pageCount: 0, percent: 0 });
     try {
       const result = await extractLayout(file, setLayoutProgress);
+      const { layoutToHtml } = await import("@/lib/pdf-layout");
       const html = layoutToHtml(result, file.name.replace(/\.\w+$/i, ""));
       setLayoutHtml(html);
       setDone(true);

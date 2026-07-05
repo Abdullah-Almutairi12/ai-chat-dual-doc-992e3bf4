@@ -1,20 +1,13 @@
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  AlignmentType,
-  PageBreak,
-  HeadingLevel,
-} from "docx";
-import { jsPDF } from "jspdf";
-import PptxGenJS from "pptxgenjs";
-import * as XLSX from "xlsx";
-
-import { extractLayout, layoutToHtml } from "@/lib/pdf-layout";
 import { groupIntoLines, joinLineItems, isRtlDominant, normalizeArabicText } from "./bidi";
-import { loadPdfjs, loadPdfLib, pdfLibToBlob, renderPageToCanvas } from "./loader";
+import { loadPdfjs, renderPageToCanvas } from "./loader";
 import { downloadBlob } from "./security";
+import {
+  loadDocxModule,
+  loadJsPdfModule,
+  loadPptxModule,
+  loadXlsxModule,
+  requireBrowser,
+} from "./runtime";
 
 export type ConvertProgress = { stage: string; percent: number; page?: number; pageCount?: number };
 
@@ -22,6 +15,11 @@ type ProgressFn = (p: ConvertProgress) => void;
 
 /** PDF → DOCX with RTL-aware paragraphs from layout engine. */
 export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const { extractLayout } = await import("@/lib/pdf-layout");
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak, HeadingLevel } =
+    await loadDocxModule();
+
   onProgress?.({ stage: "layout", percent: 5 });
   const layout = await extractLayout(file, (p) =>
     onProgress?.({
@@ -32,7 +30,8 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
     }),
   );
 
-  const children: Paragraph[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const children: any[] = [];
   for (let i = 0; i < layout.pages.length; i++) {
     const page = layout.pages[i];
     const lines = groupIntoLines(
@@ -83,6 +82,8 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
 
 /** PDF → standalone HTML with bidi-correct layout. */
 export async function pdfToHtml(file: File, onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const { extractLayout, layoutToHtml } = await import("@/lib/pdf-layout");
   onProgress?.({ stage: "layout", percent: 10 });
   const layout = await extractLayout(file, (p) =>
     onProgress?.({ stage: p.stage, percent: 10 + Math.round(p.percent * 0.85) }),
@@ -93,6 +94,8 @@ export async function pdfToHtml(file: File, onProgress?: ProgressFn): Promise<Bl
 
 /** PDF → Excel (page text per row). */
 export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const XLSX = await loadXlsxModule();
   onProgress?.({ stage: "extract", percent: 10 });
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
@@ -106,7 +109,12 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
       if ("str" in item) text += item.str + " ";
     }
     rows.push([String(i), normalizeArabicText(text.trim())]);
-    onProgress?.({ stage: "extract", percent: 10 + Math.round((i / pdf.numPages) * 80), page: i, pageCount: pdf.numPages });
+    onProgress?.({
+      stage: "extract",
+      percent: 10 + Math.round((i / pdf.numPages) * 80),
+      page: i,
+      pageCount: pdf.numPages,
+    });
   }
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -117,6 +125,9 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
 
 /** PDF → PowerPoint (one slide per page as image). */
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const pptxModule = await loadPptxModule();
+  const PptxGenJS = (pptxModule as { default: new () => { layout: string; addSlide: () => { addImage: (o: object) => void }; write: (o: object) => Promise<Blob> } } }).default;
   onProgress?.({ stage: "render", percent: 5 });
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
@@ -129,19 +140,25 @@ export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Bl
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     const slide = pptx.addSlide();
     slide.addImage({ data: dataUrl, x: 0, y: 0, w: "100%", h: "100%" });
-    onProgress?.({ stage: "render", percent: 5 + Math.round((i / pdf.numPages) * 90), page: i, pageCount: pdf.numPages });
+    onProgress?.({
+      stage: "render",
+      percent: 5 + Math.round((i / pdf.numPages) * 90),
+      page: i,
+      pageCount: pdf.numPages,
+    });
   }
 
   const out = await pptx.write({ outputType: "blob" });
   return out as Blob;
 }
 
-/** PDF → JPG/PNG images (zip-like multi-download handled by caller). */
+/** PDF → JPG/PNG images. */
 export async function pdfToImages(
   file: File,
   format: "jpeg" | "png" = "jpeg",
   onProgress?: ProgressFn,
 ): Promise<{ name: string; blob: Blob }[]> {
+  requireBrowser();
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buf }).promise;
@@ -155,13 +172,20 @@ export async function pdfToImages(
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Image export failed"))), mime, 0.92);
     });
     results.push({ name: `${base}-page-${i}.${format === "png" ? "png" : "jpg"}`, blob });
-    onProgress?.({ stage: "render", percent: Math.round((i / pdf.numPages) * 100), page: i, pageCount: pdf.numPages });
+    onProgress?.({
+      stage: "render",
+      percent: Math.round((i / pdf.numPages) * 100),
+      page: i,
+      pageCount: pdf.numPages,
+    });
   }
   return results;
 }
 
 /** Images → PDF via jsPDF. */
 export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const { jsPDF } = await loadJsPdfModule();
   const pdf = new jsPDF({ orientation: "portrait", unit: "pt" });
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -183,8 +207,10 @@ export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promi
   return pdf.output("blob");
 }
 
-/** Word/Excel → PDF (render as text pages — full fidelity requires server LibreOffice). */
+/** Word/Excel → PDF (text-based fallback). */
 export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const { jsPDF } = await loadJsPdfModule();
   onProgress?.({ stage: "read", percent: 20 });
   const text = await extractOfficeText(file);
   const pdf = new jsPDF();
@@ -207,6 +233,7 @@ export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<
 async function extractOfficeText(file: File): Promise<string> {
   const ext = file.name.split(".").pop()?.toLowerCase();
   if (ext === "xlsx" || ext === "xls") {
+    const XLSX = await loadXlsxModule();
     const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
     return wb.SheetNames.map((n) => XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n\n");
   }
@@ -214,6 +241,7 @@ async function extractOfficeText(file: File): Promise<string> {
 }
 
 function loadImage(url: string): Promise<{ data: string; width: number; height: number }> {
+  requireBrowser();
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -234,37 +262,25 @@ export async function runConversion(
   extra?: { imageFiles?: File[]; imageFormat?: "jpeg" | "png" },
   onProgress?: ProgressFn,
 ): Promise<{ blob?: Blob; blobs?: { name: string; blob: Blob }[]; ext: string }> {
+  requireBrowser();
   switch (mode) {
-    case "pdf-word": {
-      const blob = await pdfToDocx(file, onProgress);
-      return { blob, ext: "docx" };
-    }
-    case "pdf-excel": {
-      const blob = await pdfToExcel(file, onProgress);
-      return { blob, ext: "xlsx" };
-    }
-    case "pdf-ppt": {
-      const blob = await pdfToPptx(file, onProgress);
-      return { blob, ext: "pptx" };
-    }
-    case "pdf-html": {
-      const blob = await pdfToHtml(file, onProgress);
-      return { blob, ext: "html" };
-    }
+    case "pdf-word":
+      return { blob: await pdfToDocx(file, onProgress), ext: "docx" };
+    case "pdf-excel":
+      return { blob: await pdfToExcel(file, onProgress), ext: "xlsx" };
+    case "pdf-ppt":
+      return { blob: await pdfToPptx(file, onProgress), ext: "pptx" };
+    case "pdf-html":
+      return { blob: await pdfToHtml(file, onProgress), ext: "html" };
     case "pdf-jpg":
     case "pdf-png": {
       const fmt = mode === "pdf-png" ? "png" : "jpeg";
-      const blobs = await pdfToImages(file, fmt, onProgress);
-      return { blobs, ext: fmt === "png" ? "png" : "jpg" };
+      return { blobs: await pdfToImages(file, fmt, onProgress), ext: fmt === "png" ? "png" : "jpg" };
     }
-    case "images-pdf": {
-      const blob = await imagesToPdf(extra?.imageFiles ?? [file], onProgress);
-      return { blob, ext: "pdf" };
-    }
-    case "office-pdf": {
-      const blob = await officeToPdf(file, onProgress);
-      return { blob, ext: "pdf" };
-    }
+    case "images-pdf":
+      return { blob: await imagesToPdf(extra?.imageFiles ?? [file], onProgress), ext: "pdf" };
+    case "office-pdf":
+      return { blob: await officeToPdf(file, onProgress), ext: "pdf" };
     default:
       throw new Error(`Unknown conversion mode: ${mode}`);
   }
@@ -274,6 +290,7 @@ export function saveConversionResult(
   result: { blob?: Blob; blobs?: { name: string; blob: Blob }[]; ext: string },
   baseName: string,
 ): void {
+  if (typeof window === "undefined") return;
   if (result.blobs?.length) {
     for (const b of result.blobs) downloadBlob(b.blob, b.name);
     return;

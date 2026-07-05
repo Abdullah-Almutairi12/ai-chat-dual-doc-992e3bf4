@@ -1,6 +1,5 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export type AnnotationType = "highlight" | "text" | "rectangle" | "redact";
 
@@ -16,6 +15,8 @@ export type Annotation = {
 };
 
 export async function applyAnnotations(file: File, annotations: Annotation[]): Promise<Blob> {
+  requireBrowser();
+  const { rgb, StandardFonts } = await loadPdfLibModule();
   const doc = await loadPdfLib(file);
   const font = await doc.embedFont(StandardFonts.Helvetica);
 
@@ -107,6 +108,7 @@ export async function insertImageOnPage(
   w: number,
   h: number,
 ): Promise<Blob> {
+  requireBrowser();
   const doc = await loadPdfLib(file);
   const page = doc.getPage(pageNum - 1);
   const img = await doc.embedPng(imageBytes).catch(() => doc.embedJpg(imageBytes));

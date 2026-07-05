@@ -1,4 +1,5 @@
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export type ProtectionOptions = {
   userPassword: string;
@@ -7,11 +8,8 @@ export type ProtectionOptions = {
   allowCopying?: boolean;
 };
 
-/**
- * Set document passwords and permissions.
- * pdf-lib supports encryption with user/owner passwords.
- */
 export async function protectPdf(file: File, opts: ProtectionOptions): Promise<Blob> {
+  requireBrowser();
   const doc = await loadPdfLib(file);
   const bytes = await doc.save({
     userPassword: opts.userPassword,
@@ -25,10 +23,10 @@ export async function protectPdf(file: File, opts: ProtectionOptions): Promise<B
   return new Blob([bytes], { type: "application/pdf" });
 }
 
-/** Remove password protection by re-saving an unlocked copy (requires correct password at load time). */
 export async function removeProtection(file: File, password: string): Promise<Blob> {
+  requireBrowser();
   const buf = await file.arrayBuffer();
-  const { PDFDocument } = await import("pdf-lib");
+  const { PDFDocument } = await loadPdfLibModule();
   const doc = await PDFDocument.load(buf, { password });
   return pdfLibToBlob(doc);
 }

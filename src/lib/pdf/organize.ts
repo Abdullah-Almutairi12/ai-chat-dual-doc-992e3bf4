@@ -1,8 +1,9 @@
-import { PDFDocument, degrees } from "pdf-lib";
-
+import { loadPdfLibModule, requireBrowser } from "./runtime";
 import { loadPdfLib, pdfLibToBlob, readPdfBytes } from "./loader";
 
 export async function mergePdfs(files: File[]): Promise<Blob> {
+  requireBrowser();
+  const { PDFDocument } = await loadPdfLibModule();
   const merged = await PDFDocument.create();
   for (const file of files) {
     const bytes = await readPdfBytes(file);
@@ -14,6 +15,8 @@ export async function mergePdfs(files: File[]): Promise<Blob> {
 }
 
 export async function splitPdf(file: File, ranges: { start: number; end: number }[]): Promise<Blob[]> {
+  requireBrowser();
+  const { PDFDocument } = await loadPdfLibModule();
   const src = await loadPdfLib(file);
   const total = src.getPageCount();
   const out: Blob[] = [];
@@ -32,6 +35,8 @@ export async function splitPdf(file: File, ranges: { start: number; end: number 
 }
 
 export async function splitEveryPage(file: File): Promise<Blob[]> {
+  requireBrowser();
+  const { PDFDocument } = await loadPdfLibModule();
   const src = await loadPdfLib(file);
   const total = src.getPageCount();
   const out: Blob[] = [];
@@ -45,6 +50,8 @@ export async function splitEveryPage(file: File): Promise<Blob[]> {
 }
 
 export async function deletePages(file: File, pageNumbers: number[]): Promise<Blob> {
+  requireBrowser();
+  const { PDFDocument } = await loadPdfLibModule();
   const doc = await loadPdfLib(file);
   const toRemove = new Set(pageNumbers.map((n) => n - 1));
   const indices = doc.getPageIndices().filter((i) => !toRemove.has(i));
@@ -55,6 +62,8 @@ export async function deletePages(file: File, pageNumbers: number[]): Promise<Bl
 }
 
 export async function rotatePages(file: File, pageNumbers: number[], angle: 90 | 180 | 270): Promise<Blob> {
+  requireBrowser();
+  const { degrees } = await loadPdfLibModule();
   const doc = await loadPdfLib(file);
   const targets = pageNumbers.length ? pageNumbers.map((n) => n - 1) : doc.getPageIndices();
   for (const idx of targets) {
@@ -67,6 +76,8 @@ export async function rotatePages(file: File, pageNumbers: number[], angle: 90 |
 }
 
 export async function reorderPages(file: File, order: number[]): Promise<Blob> {
+  requireBrowser();
+  const { PDFDocument } = await loadPdfLibModule();
   const src = await loadPdfLib(file);
   const newDoc = await PDFDocument.create();
   const indices = order.map((n) => n - 1);
@@ -78,6 +89,7 @@ export async function reorderPages(file: File, order: number[]): Promise<Blob> {
 export type PageThumb = { page: number; dataUrl: string; width: number; height: number };
 
 export async function getPageThumbnails(file: File, maxPages = 40): Promise<PageThumb[]> {
+  requireBrowser();
   const { loadPdfjs, renderPageToCanvas } = await import("./loader");
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();

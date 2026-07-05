@@ -176,6 +176,9 @@ async function extractPdf(file: File, onProgress?: ProgressFn): Promise<ExtractR
 
 /** Entry point: extract text from a PDF or image file. */
 export async function extractDocument(file: File, onProgress?: ProgressFn): Promise<ExtractResult> {
+  if (typeof window === "undefined") {
+    return { text: "", pageCount: 0, ocrPageCount: 0, usedOcr: false, isRtl: false };
+  }
   const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
   if (isPdf) return extractPdf(file, onProgress);
   const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(file.name);

@@ -1,17 +1,15 @@
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export type OptimizeLevel = "low" | "medium" | "high";
 
-/**
- * Compress PDF by re-encoding page content streams and downscaling embedded images.
- * Vector text remains sharp; raster content is quality-adjusted per level.
- */
 export async function optimizePdf(file: File, level: OptimizeLevel = "medium"): Promise<Blob> {
+  requireBrowser();
   const { loadPdfjs, renderPageToCanvas } = await import("./loader");
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buf }).promise;
-  const { PDFDocument } = await import("pdf-lib");
+  const { PDFDocument } = await loadPdfLibModule();
   const newDoc = await PDFDocument.create();
 
   const scaleMap = { low: 1.8, medium: 1.4, high: 1.0 };

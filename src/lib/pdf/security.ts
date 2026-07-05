@@ -63,6 +63,7 @@ export function escapeHtml(s: string): string {
 }
 
 export function downloadBlob(blob: Blob, fileName: string): void {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

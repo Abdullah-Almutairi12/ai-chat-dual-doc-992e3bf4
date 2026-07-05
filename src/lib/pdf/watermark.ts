@@ -1,6 +1,5 @@
-import { PDFDocument, rgb, degrees } from "pdf-lib";
-
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export type WatermarkOptions = {
   text?: string;
@@ -12,6 +11,8 @@ export type WatermarkOptions = {
 };
 
 export async function addWatermark(file: File, opts: WatermarkOptions): Promise<Blob> {
+  requireBrowser();
+  const { rgb, degrees } = await loadPdfLibModule();
   const doc = await loadPdfLib(file);
   const opacity = opts.opacity ?? 0.3;
   const rotation = opts.rotation ?? -30;
@@ -62,12 +63,9 @@ export async function addWatermark(file: File, opts: WatermarkOptions): Promise<
   return pdfLibToBlob(doc);
 }
 
-/**
- * Smart watermark removal: rasterize each page and apply a light median filter
- * on semi-transparent grey regions typical of text watermarks, then rebuild PDF.
- * Preserves underlying content by keeping the original page as base layer.
- */
 export async function removeWatermark(file: File, onProgress?: (p: number) => void): Promise<Blob> {
+  requireBrowser();
+  const { PDFDocument } = await loadPdfLibModule();
   const { loadPdfjs, renderPageToCanvas } = await import("./loader");
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
@@ -87,6 +85,7 @@ export async function removeWatermark(file: File, onProgress?: (p: number) => vo
 }
 
 function cleanWatermarkArtifacts(canvas: HTMLCanvasElement): void {
+  if (typeof document === "undefined") return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const { width, height } = canvas;
@@ -98,7 +97,6 @@ function cleanWatermarkArtifacts(canvas: HTMLCanvasElement): void {
     const b = d[i + 2];
     const grey = (r + g + b) / 3;
     const spread = Math.max(r, g, b) - Math.min(r, g, b);
-    // Detect light grey semi-watermark pixels
     if (grey > 180 && grey < 240 && spread < 30) {
       d[i] = 255;
       d[i + 1] = 255;

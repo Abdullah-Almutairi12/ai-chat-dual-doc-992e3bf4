@@ -72,6 +72,9 @@ async function loadPdfjs() {
 }
 
 async function renderCanvas(page: any, viewport: any): Promise<HTMLCanvasElement> {
+  if (typeof document === "undefined") {
+    throw new Error("Canvas rendering requires a browser environment");
+  }
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
@@ -152,6 +155,9 @@ function boxesFromOcr(data: any): LayoutBox[] {
 }
 
 export async function extractLayout(file: File, onProgress?: ProgressFn): Promise<LayoutResult> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    throw new Error("Layout extraction requires a browser environment");
+  }
   const pdfjs = await loadPdfjs();
   onProgress?.({ stage: "loading", page: 0, pageCount: 0, percent: 2 });
 

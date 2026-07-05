@@ -1,6 +1,9 @@
-import { PDFDocument } from "pdf-lib";
+import type { PDFDocument } from "pdf-lib";
+
+import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export async function loadPdfjs() {
+  requireBrowser();
   const pdfjs = await import("pdfjs-dist");
   const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -13,6 +16,7 @@ export async function readPdfBytes(file: File | Blob): Promise<Uint8Array> {
 }
 
 export async function loadPdfLib(file: File | Blob): Promise<PDFDocument> {
+  const { PDFDocument } = await loadPdfLibModule();
   const bytes = await readPdfBytes(file);
   return PDFDocument.load(bytes, { ignoreEncryption: true });
 }
@@ -23,12 +27,13 @@ export async function pdfLibToBlob(doc: PDFDocument): Promise<Blob> {
 }
 
 export async function renderPageToCanvas(
-  pdfjsDoc: Awaited<ReturnType<typeof loadPdfjs>> extends infer _ ? any : never,
+  pdfjsDoc: { getPage: (n: number) => Promise<{ getViewport: (o: { scale: number }) => unknown; render: (o: unknown) => { promise: Promise<void> } }> } },
   pageNum: number,
   scale = 2,
 ): Promise<{ canvas: HTMLCanvasElement; width: number; height: number }> {
+  requireBrowser();
   const page = await pdfjsDoc.getPage(pageNum);
-  const viewport = page.getViewport({ scale });
+  const viewport = page.getViewport({ scale }) as { width: number; height: number; transform: number[] };
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);

@@ -1,6 +1,5 @@
-import { PDFDocument } from "pdf-lib";
-
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { requireBrowser } from "./runtime";
 
 export type SignatureOptions = {
   page: number;
@@ -8,12 +7,12 @@ export type SignatureOptions = {
   y: number;
   width: number;
   height: number;
-  /** PNG/JPG bytes of drawn, typed, or uploaded signature */
   imageBytes: Uint8Array;
   label?: string;
 };
 
 export async function applySignatures(file: File, signatures: SignatureOptions[]): Promise<Blob> {
+  requireBrowser();
   const doc = await loadPdfLib(file);
   for (const sig of signatures) {
     const page = doc.getPage(sig.page - 1);
@@ -37,8 +36,8 @@ export async function applySignatures(file: File, signatures: SignatureOptions[]
   return pdfLibToBlob(doc);
 }
 
-/** Render typed signature to PNG bytes via canvas. */
 export function typedSignatureToBytes(text: string, fontFamily = "Segoe Script"): Uint8Array {
+  requireBrowser();
   const canvas = document.createElement("canvas");
   canvas.width = 320;
   canvas.height = 80;
@@ -58,6 +57,7 @@ export function typedSignatureToBytes(text: string, fontFamily = "Segoe Script")
 }
 
 export async function drawSignatureToBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  requireBrowser();
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Signature export failed"))), "image/png");
   });

@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/tools")({
+  ssr: false,
   head: () =>
     pageHead({
       path: "/tools",

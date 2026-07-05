@@ -10,15 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
 import { getPdfTool, type PdfTool } from "@/lib/pdf-tools";
-import { runConversion, saveConversionResult } from "@/lib/pdf/convert";
-import { addTextToPdf, redactRegions } from "@/lib/pdf/editor";
-import { deletePages, mergePdfs, reorderPages, rotatePages, splitEveryPage } from "@/lib/pdf/organize";
-import { optimizePdf } from "@/lib/pdf/optimize";
-import { protectPdf, removeProtection } from "@/lib/pdf/protect";
-import { downloadBlob, sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/security";
-import { applySignatures, drawSignatureToBytes, typedSignatureToBytes } from "@/lib/pdf/sign";
-import { addWatermark, removeWatermark } from "@/lib/pdf/watermark";
-import { applyAnnotations } from "@/lib/pdf/editor";
+import { sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/security";
 import { useEntitlement } from "@/lib/entitlement";
 import { addDocument } from "@/lib/documents";
 
@@ -110,9 +102,10 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
     try {
       const base = sanitizeFileName(files[0].name.replace(/\.\w+$/i, ""));
+      const pdf = await import("@/lib/pdf/client-api");
 
       if (tool.convertMode) {
-        const result = await runConversion(
+        const result = await pdf.runConversion(
           tool.convertMode,
           files[0],
           { imageFiles: files },
@@ -122,7 +115,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
           setResultBlob(result.blob);
           setResultName(`${base}.${result.ext}`);
         } else if (result.blobs) {
-          for (const b of result.blobs) downloadBlob(b.blob, b.name);
+          for (const b of result.blobs) pdf.downloadBlob(b.blob, b.name);
           toast.success(t("convert_done"));
         }
         setProcessing(false);
@@ -132,86 +125,86 @@ export function PdfToolWorkspace({ toolId }: Props) {
       let blob: Blob;
       switch (tool.id) {
         case "merge":
-          blob = await mergePdfs(files);
+          blob = await pdf.mergePdfs(files);
           setResultName(`${base}-merged.pdf`);
           break;
         case "split": {
-          const parts = await splitEveryPage(files[0]);
+          const parts = await pdf.splitEveryPage(files[0]);
           for (const [i, b] of parts.entries()) {
-            downloadBlob(b, `${base}-part-${i + 1}.pdf`);
+            pdf.downloadBlob(b, `${base}-part-${i + 1}.pdf`);
           }
           toast.success(t("convert_done"));
           setProcessing(false);
           return;
         }
         case "rotate":
-          blob = await rotatePages(files[0], [], rotateAngle);
+          blob = await pdf.rotatePages(files[0], [], rotateAngle);
           setResultName(`${base}-rotated.pdf`);
           break;
         case "delete-pages": {
           const nums = deletePageStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
-          blob = await deletePages(files[0], nums);
+          blob = await pdf.deletePages(files[0], nums);
           setResultName(`${base}-edited.pdf`);
           break;
         }
         case "watermark-add":
-          blob = await addWatermark(files[0], { text: wmText, opacity: wmOpacity, rotation: wmRotation });
+          blob = await pdf.addWatermark(files[0], { text: wmText, opacity: wmOpacity, rotation: wmRotation });
           setResultName(`${base}-watermarked.pdf`);
           break;
         case "watermark-remove":
-          blob = await removeWatermark(files[0], (p) =>
+          blob = await pdf.removeWatermark(files[0], (p) =>
             setProgress({ label: t("pdf_wm_scanning"), percent: p, stage: "" }),
           );
           setResultName(`${base}-clean.pdf`);
           break;
         case "compress":
-          blob = await optimizePdf(files[0], compressLevel);
+          blob = await pdf.optimizePdf(files[0], compressLevel);
           setResultName(`${base}-optimized.pdf`);
           break;
         case "add-text":
-          blob = await addTextToPdf(files[0], [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }]);
+          blob = await pdf.addTextToPdf(files[0], [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }]);
           setResultName(`${base}-edited.pdf`);
           break;
         case "redact":
-          blob = await redactRegions(files[0], [
+          blob = await pdf.redactRegions(files[0], [
             { page: redactPage, x: 72, y: 700, width: 200, height: 20 },
           ]);
           setResultName(`${base}-redacted.pdf`);
           break;
         case "reorder": {
           const order = reorderStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
-          blob = await reorderPages(files[0], order.length ? order : [1]);
+          blob = await pdf.reorderPages(files[0], order.length ? order : [1]);
           setResultName(`${base}-reordered.pdf`);
           break;
         }
         case "annotate":
-          blob = await applyAnnotations(files[0], [
+          blob = await pdf.applyAnnotations(files[0], [
             { type: "highlight", page: 1, x: 72, y: 700, width: 200, height: 16 },
           ]);
           setResultName(`${base}-annotated.pdf`);
           break;
         case "stamp": {
-          const bytes = typedSignatureToBytes("STAMP");
-          blob = await applySignatures(files[0], [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }]);
+          const bytes = pdf.typedSignatureToBytes("STAMP");
+          blob = await pdf.applySignatures(files[0], [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }]);
           setResultName(`${base}-stamped.pdf`);
           break;
         }
         case "sign": {
           const bytes = signText
-            ? typedSignatureToBytes(signText)
+            ? pdf.typedSignatureToBytes(signText)
             : sigCanvasRef.current
-              ? await drawSignatureToBytes(sigCanvasRef.current)
-              : typedSignatureToBytes("Signed");
-          blob = await applySignatures(files[0], [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }]);
+              ? await pdf.drawSignatureToBytes(sigCanvasRef.current)
+              : pdf.typedSignatureToBytes("Signed");
+          blob = await pdf.applySignatures(files[0], [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }]);
           setResultName(`${base}-signed.pdf`);
           break;
         }
         case "protect":
-          blob = await protectPdf(files[0], { userPassword: protectPass, allowPrinting: false, allowCopying: false });
+          blob = await pdf.protectPdf(files[0], { userPassword: protectPass, allowPrinting: false, allowCopying: false });
           setResultName(`${base}-protected.pdf`);
           break;
         case "unlock":
-          blob = await removeProtection(files[0], unlockPass);
+          blob = await pdf.removeProtection(files[0], unlockPass);
           setResultName(`${base}-unlocked.pdf`);
           break;
         default:
@@ -348,7 +341,10 @@ export function PdfToolWorkspace({ toolId }: Props) {
             <Button
               variant="outline"
               className="gap-2"
-              onClick={() => downloadBlob(resultBlob, resultName)}
+              onClick={async () => {
+                const { downloadBlob } = await import("@/lib/pdf/security");
+                downloadBlob(resultBlob, resultName);
+              }}
             >
               <Download className="h-4 w-4" />
               {t("convert_download")}
