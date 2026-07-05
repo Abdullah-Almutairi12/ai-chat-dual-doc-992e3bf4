@@ -11,13 +11,24 @@ import { tools } from "@/lib/tools";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PDF Quanta — The Quantum Leap in Document Intelligence" },
+      { title: "PDF Quanta — AI PDF Tools: Chat, Convert & Analyze PDFs" },
       {
         name: "description",
         content:
-          "Chat with PDFs, extract tables to Excel, proofread, convert, generate quizzes, and analyze financial or legal documents in one bilingual AI suite.",
+          "PDF Quanta is a bilingual AI PDF suite: chat with PDFs, extract tables to Excel, proofread, convert to Word, generate quizzes, and analyze documents.",
       },
+      { property: "og:title", content: "PDF Quanta — AI PDF Tools: Chat, Convert & Analyze PDFs" },
+      {
+        property: "og:description",
+        content:
+          "Chat with PDFs, extract tables to Excel, proofread, convert to Word, generate quizzes, and analyze financial or legal documents in one AI suite.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pdfquanta.online/" },
+      { property: "og:image", content: "https://pdfquanta.online/og-image.jpg" },
+      { name: "twitter:image", content: "https://pdfquanta.online/og-image.jpg" },
     ],
+    links: [{ rel: "canonical", href: "https://pdfquanta.online/" }],
   }),
   component: Landing,
 });
