@@ -69,13 +69,14 @@ export function LogoIcon({ size = 36, className }: { size?: number; className?: 
 }
 
 export function Logo({ size = 36, showText = true, className, textClassName }: LogoProps) {
+  const { t } = useI18n();
   return (
     <span className={cn("flex min-w-0 items-center gap-2.5", className)}>
       <LogoIcon size={size} className="drop-shadow-[0_4px_12px_color-mix(in_oklab,var(--primary)_35%,transparent)]" />
       {showText && (
         <span className={cn("truncate text-lg font-bold tracking-tight", textClassName)}>
           <span className="font-semibold text-muted-foreground">PDF</span>
-          <span className="bg-gradient-to-r from-primary to-[#7C3AED] bg-clip-text text-transparent"> Quanta</span>
+          <span className="bg-gradient-to-r from-primary to-[#7C3AED] bg-clip-text text-transparent"> {t("brand")?.replace(/^PDF\s*/i, "") || "Quanta"}</span>
         </span>
       )}
     </span>
