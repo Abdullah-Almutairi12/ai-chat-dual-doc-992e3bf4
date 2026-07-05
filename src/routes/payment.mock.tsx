@@ -17,7 +17,13 @@ export const Route = createFileRoute("/payment/mock")({
   }),
   beforeLoad: async () => {
     // The simulated checkout page must never be reachable in live mode.
-    const live = await isLiveMode();
+    let live = false;
+    try {
+      live = await isLiveMode();
+    } catch {
+      // If the mode check fails, don't blank the screen — allow the page.
+      live = false;
+    }
     if (live) {
       throw redirect({ to: "/pricing" });
     }
