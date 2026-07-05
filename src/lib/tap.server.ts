@@ -11,6 +11,15 @@ function tapKey(): string {
   return key;
 }
 
+/**
+ * True when a real Tap LIVE secret key is configured (sk_live_...).
+ * In live mode we must never fall back to the simulated checkout, because that
+ * would grant credits without a real payment.
+ */
+export function isTapLiveMode(): boolean {
+  return (process.env.TAP_SECRET_KEY ?? "").startsWith("sk_live_");
+}
+
 async function tapFetch(path: string, init: RequestInit = {}) {
   const res = await fetch(`${TAP_BASE}${path}`, {
     ...init,

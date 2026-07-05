@@ -13,15 +13,21 @@ export const createCheckout = createServerFn({ method: "POST" })
     const origin = data.origin?.startsWith("http") ? data.origin : "";
     if (!origin) throw new Error("Invalid origin");
 
-    const { createTapCharge, createMockCharge } = await import("./tap.server");
+    const { createTapCharge, createMockCharge, isTapLiveMode } = await import("./tap.server");
     const email = (context.claims as { email?: string })?.email ?? "";
     try {
       const { url } = await createTapCharge({ userId: context.userId, email, plan, origin });
       return { url, simulated: false };
     } catch (err) {
-      // Tap unreachable / invalid key (e.g. placeholder sandbox keys) →
-      // fall back to the built-in simulated checkout so the flow still works.
-      console.error("[createCheckout] Tap failed, using simulated checkout:", err);
+      // In LIVE mode never fall back to the simulated checkout — that would
+      // grant credits without a real payment. Surface the error instead.
+      if (isTapLiveMode()) {
+        console.error("[createCheckout] Tap live charge failed:", err);
+        throw new Error("Payment could not be started. Please try again.");
+      }
+      // Test mode only: fall back to the built-in simulated checkout so the
+      // flow still works with placeholder/sandbox keys.
+      console.error("[createCheckout] Tap failed (test mode), using simulated checkout:", err);
       const { url } = await createMockCharge({ userId: context.userId, plan, origin });
       return { url, simulated: true };
     }
