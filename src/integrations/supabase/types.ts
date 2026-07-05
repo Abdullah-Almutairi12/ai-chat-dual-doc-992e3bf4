@@ -80,6 +80,7 @@ export type Database = {
           created_at: string
           credits: number
           email: string
+          files_processed: number
           free_claimed: boolean
           id: string
           name: string
@@ -93,6 +94,7 @@ export type Database = {
           created_at?: string
           credits?: number
           email: string
+          files_processed?: number
           free_claimed?: boolean
           id?: string
           name?: string
@@ -106,6 +108,7 @@ export type Database = {
           created_at?: string
           credits?: number
           email?: string
+          files_processed?: number
           free_claimed?: boolean
           id?: string
           name?: string
@@ -256,6 +259,10 @@ export type Database = {
       add_credits: {
         Args: { _amount: number; _user_id: string }
         Returns: undefined
+      }
+      consume_free_file: {
+        Args: { _limit: number; _user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
