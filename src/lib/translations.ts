@@ -111,6 +111,12 @@ const en = {
   convert_download: "Download result",
   convert_ocr_note: "Optimized for accurate Arabic character recognition.",
   convert_result_title: "Result preview",
+  convert_layout: "Layout-preserving",
+  convert_layout_note:
+    "Keeps the exact visual design — tables, columns, images and Arabic text stay in their original positions.",
+  convert_layout_building: "Rebuilding layout…",
+  convert_layout_hint: "Scroll to review every page. Text stays selectable over the original design.",
+  convert_download_html: "Download HTML (layout)",
 
   // quiz
   quiz_generate: "Generate quiz",
@@ -257,6 +263,12 @@ const ar: Record<keyof typeof en, string> = {
   convert_download: "تنزيل النتيجة",
   convert_ocr_note: "محسّن للتعرف الدقيق على الحروف العربية.",
   convert_result_title: "معاينة النتيجة",
+  convert_layout: "الحفاظ على التصميم",
+  convert_layout_note:
+    "يحافظ على التصميم المرئي تمامًا — الجداول والأعمدة والصور والنص العربي تبقى في مواضعها الأصلية.",
+  convert_layout_building: "جارٍ إعادة بناء التصميم…",
+  convert_layout_hint: "مرّر لمراجعة كل صفحة. يبقى النص قابلًا للتحديد فوق التصميم الأصلي.",
+  convert_download_html: "تنزيل HTML (بالتصميم)",
 
   quiz_generate: "أنشئ الاختبار",
   quiz_generating: "جارٍ إنشاء الأسئلة…",
