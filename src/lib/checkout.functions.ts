@@ -3,6 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPlan } from "./packages";
 
+/** Returns true when a Tap LIVE secret key is configured (sk_live_*). */
+export const isLiveMode = createServerFn({ method: "GET" }).handler(async () => {
+  const { isTapLiveMode } = await import("./tap.server");
+  return isTapLiveMode();
+});
+
 /** Start a Tap checkout for a paid plan. Returns the hosted-page URL. */
 export const createCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
