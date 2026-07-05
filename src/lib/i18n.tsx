@@ -26,6 +26,16 @@ function applyDocument(lang: Lang) {
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
 }
 
+/** Detect the user's preferred language from the browser. Arabic → "ar", everything else → "en". */
+function detectBrowserLang(): Lang {
+  if (typeof navigator === "undefined") return "en";
+  const candidates = [
+    ...(navigator.languages ?? []),
+    navigator.language,
+  ].filter(Boolean) as string[];
+  return candidates.some((l) => l.toLowerCase().startsWith("ar")) ? "ar" : "en";
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
 
@@ -36,7 +46,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setLangState(stored);
       applyDocument(stored);
     } else {
-      applyDocument("en");
+      // No saved choice yet: fall back to the browser's preferred language.
+      const detected = detectBrowserLang();
+      setLangState(detected);
+      applyDocument(detected);
     }
   }, []);
 
