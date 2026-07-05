@@ -13,6 +13,8 @@ const en = {
   nav_admin: "Admin",
   nav_signup: "Sign up",
   nav_pricing: "Pricing",
+  nav_account: "Account",
+  nav_logout: "Sign out",
 
   // hero
   hero_badge: "AI-powered · Bilingual",
@@ -176,6 +178,8 @@ const ar: Record<keyof typeof en, string> = {
   nav_admin: "الإدارة",
   nav_signup: "إنشاء حساب",
   nav_pricing: "الباقات",
+  nav_account: "الحساب",
+  nav_logout: "تسجيل الخروج",
 
   hero_badge: "مدعوم بالذكاء الاصطناعي · ثنائي اللغة",
   hero_title: "مساحة عملك الذكية للمستندات",
