@@ -7,6 +7,7 @@ import { FileDropzone, LoadingRow, ToolHeader } from "@/components/FileDropzone"
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/seo";
+import { useActiveDocument } from "@/lib/active-document";
 
 export const Route = createFileRoute("/_app/converter")({
   head: () =>
@@ -22,27 +23,25 @@ export const Route = createFileRoute("/_app/converter")({
 type Mode = "word" | "ocr";
 
 function ConverterTool() {
-  const { t, lang } = useI18n();
-  const [file, setFile] = useState<string | null>(null);
+  const { t } = useI18n();
+  const { doc, clear } = useActiveDocument();
+  const file = doc?.name ?? null;
   const [mode, setMode] = useState<Mode>("word");
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
 
   const run = () => {
-    if (!file) return;
+    if (!doc) return;
     setProcessing(true);
     setDone(false);
     setTimeout(() => {
       setProcessing(false);
       setDone(true);
       toast.success(t("convert_done"));
-    }, 1400);
+    }, 500);
   };
 
-  const preview =
-    lang === "ar"
-      ? "هذا نص قابل للتحرير تم استخراجه من المستند مع الحفاظ على دقة الحروف العربية والتشكيل والفقرات."
-      : "This is editable text extracted from your document, preserving paragraphs, layout, and character accuracy.";
+  const preview = doc?.text?.trim() || t("extract_empty");
 
   const download = () => {
     const blob = new Blob([preview], { type: "text/plain;charset=utf-8" });
@@ -65,13 +64,21 @@ function ConverterTool() {
 
       <FileDropzone
         tool="converter"
-        onFile={(f) => {
-          setFile(f.name);
-          setDone(false);
-        }}
+        onFile={() => setDone(false)}
         accept="application/pdf,.pdf,image/*"
         fileName={file}
       />
+      {doc && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            {doc.pageCount} {t("pages_label")}
+          </span>
+          <span>{doc.usedOcr ? t("ocr_badge") : t("text_layer_badge")}</span>
+          <button onClick={clear} className="font-medium text-primary hover:underline">
+            {t("dropzone_replace")}
+          </button>
+        </div>
+      )}
 
       <div className="mt-6">
         <p className="mb-3 text-sm font-semibold text-foreground">{t("convert_target")}</p>
@@ -115,7 +122,12 @@ function ConverterTool() {
       {done && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
           <h3 className="mb-3 text-sm font-semibold text-foreground">{t("convert_result_title")}</h3>
-          <p className="rounded-xl bg-accent/40 p-4 text-sm leading-relaxed text-foreground">{preview}</p>
+          <p
+            dir="auto"
+            className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl bg-accent/40 p-4 text-sm leading-relaxed text-foreground"
+          >
+            {preview}
+          </p>
           <Button onClick={download} variant="outline" className="mt-4 gap-2">
             <Download className="h-4 w-4" />
             {t("convert_download")}
