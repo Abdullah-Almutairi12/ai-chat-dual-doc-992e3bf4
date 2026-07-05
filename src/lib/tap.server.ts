@@ -152,6 +152,41 @@ async function fulfillFromMeta(args: {
 
   await supabaseAdmin.from("profiles").update({ tier: plan.id }).eq("user_id", args.userId);
 
+  // Send the payment invoice/receipt via Resend. Never let email failure break
+  // fulfillment — credits are already applied above.
+  try {
+    let email = args.email;
+    if (!email || !email.includes("@") || email === "unknown@pdfquanta.app") {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("email,name")
+        .eq("user_id", args.userId)
+        .maybeSingle();
+      email = prof?.email || email;
+    }
+    if (email && email.includes("@")) {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("name")
+        .eq("user_id", args.userId)
+        .maybeSingle();
+      const { sendInvoiceEmail } = await import("./email.server");
+      await sendInvoiceEmail({
+        to: email,
+        name: prof?.name ?? null,
+        planNameEn: plan.nameEn,
+        planNameAr: plan.nameAr,
+        amount: args.amount || plan.price,
+        currency: args.currency || CURRENCY,
+        credits: plan.credits,
+        invoiceId: args.chargeId,
+        kind: args.kind,
+      });
+    }
+  } catch (err) {
+    console.error("[fulfillFromMeta] invoice email failed:", err);
+  }
+
   return { ...result, fulfilled: true };
 }
 

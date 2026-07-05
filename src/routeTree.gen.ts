@@ -29,6 +29,7 @@ import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
 import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
+import { Route as ApiPublicSendWelcomeRouteImport } from './routes/api/public/send-welcome'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminFinancialsRouteImport } from './routes/_authenticated/admin.financials'
@@ -132,6 +133,11 @@ const ApiPublicTapRenewRoute = ApiPublicTapRenewRouteImport.update({
   path: '/api/public/tap-renew',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSendWelcomeRoute = ApiPublicSendWelcomeRouteImport.update({
+  id: '/api/public/send-welcome',
+  path: '/api/public/send-welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -226,6 +234,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -252,6 +261,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
     | '/admin/'
@@ -275,6 +285,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
     | '/admin'
@@ -301,6 +312,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
+    | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
     | '/_authenticated/admin/'
@@ -316,6 +328,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   PaymentCallbackRoute: typeof PaymentCallbackRoute
   PaymentMockRoute: typeof PaymentMockRoute
+  ApiPublicSendWelcomeRoute: typeof ApiPublicSendWelcomeRoute
   ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
   ApiPublicTapWebhookRoute: typeof ApiPublicTapWebhookRoute
 }
@@ -462,6 +475,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTapRenewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/send-welcome': {
+      id: '/api/public/send-welcome'
+      path: '/api/public/send-welcome'
+      fullPath: '/api/public/send-welcome'
+      preLoaderRoute: typeof ApiPublicSendWelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -555,19 +575,10 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   PaymentCallbackRoute: PaymentCallbackRoute,
   PaymentMockRoute: PaymentMockRoute,
+  ApiPublicSendWelcomeRoute: ApiPublicSendWelcomeRoute,
   ApiPublicTapRenewRoute: ApiPublicTapRenewRoute,
   ApiPublicTapWebhookRoute: ApiPublicTapWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

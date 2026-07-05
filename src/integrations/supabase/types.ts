@@ -86,6 +86,7 @@ export type Database = {
           tier: string
           updated_at: string
           user_id: string | null
+          welcome_sent: boolean
         }
         Insert: {
           banned?: boolean
@@ -98,6 +99,7 @@ export type Database = {
           tier?: string
           updated_at?: string
           user_id?: string | null
+          welcome_sent?: boolean
         }
         Update: {
           banned?: boolean
@@ -110,6 +112,7 @@ export type Database = {
           tier?: string
           updated_at?: string
           user_id?: string | null
+          welcome_sent?: boolean
         }
         Relationships: []
       }
