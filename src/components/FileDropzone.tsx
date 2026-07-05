@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { addDocument } from "@/lib/documents";
 import { extractDocument, type ExtractProgress } from "@/lib/pdf-extract";
+import { validateUpload } from "@/lib/pdf/security";
 import { useActiveDocument, type ActiveDocument } from "@/lib/active-document";
 import { useEntitlement } from "@/lib/entitlement";
 import { FreeCreditBadge } from "@/components/FreeCreditBadge";
@@ -35,6 +36,11 @@ export function FileDropzone({
   const handle = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
+    const valid = validateUpload(file, { kind: "any" });
+    if (!valid.ok) {
+      toast.error(t("invalid_file"));
+      return;
+    }
     // Fast pre-check: if the free trial is already exhausted, prompt to upgrade
     // before spending time on extraction.
     if (entitlement && !entitlement.allowed) {

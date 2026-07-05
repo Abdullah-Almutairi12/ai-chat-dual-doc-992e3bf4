@@ -6,7 +6,7 @@ export type PdfDocument = {
   tool: string;
 };
 
-const STORAGE_KEY = "documind-docs";
+const STORAGE_KEY = "pdfquanta-docs";
 
 function read(): PdfDocument[] {
   if (typeof window === "undefined") return [];
@@ -21,7 +21,7 @@ function read(): PdfDocument[] {
 function write(docs: PdfDocument[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
-  window.dispatchEvent(new Event("documind-docs-changed"));
+  window.dispatchEvent(new Event("pdfquanta-docs-changed"));
 }
 
 export function getDocuments(): PdfDocument[] {
@@ -42,23 +42,4 @@ export function addDocument(name: string, sizeKb: number, tool: string): PdfDocu
 
 export function deleteDocument(id: string) {
   write(read().filter((d) => d.id !== id));
-}
-
-const answersEn = [
-  "Based on the document, the main point is that the approach delivers measurable improvements across the key metrics discussed.",
-  "The document highlights three core themes: context, methodology, and outcomes — each supported by concrete examples.",
-  "In summary, the author argues for a structured process and backs it with data from the referenced sections.",
-  "Yes — the relevant section confirms this and provides additional detail in the following paragraphs.",
-];
-
-const answersAr = [
-  "استنادًا إلى المستند، النقطة الرئيسية هي أن النهج يحقق تحسينات ملموسة عبر المقاييس الأساسية المذكورة.",
-  "يبرز المستند ثلاثة محاور رئيسية: السياق والمنهجية والنتائج — كل منها مدعوم بأمثلة واضحة.",
-  "باختصار، يدعو الكاتب إلى عملية منظّمة ويدعمها ببيانات من الأقسام المشار إليها.",
-  "نعم — يؤكد القسم ذو الصلة ذلك ويقدّم تفاصيل إضافية في الفقرات التالية.",
-];
-
-export function mockAnswer(lang: "en" | "ar"): string {
-  const pool = lang === "ar" ? answersAr : answersEn;
-  return pool[Math.floor(Math.random() * pool.length)];
 }

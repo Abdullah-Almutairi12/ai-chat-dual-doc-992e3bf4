@@ -1,8 +1,9 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PdfToolsPreviewGrid } from "@/components/pdf/PdfToolsHub";
 import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,6 +69,29 @@ function Dashboard() {
         <Button asChild size="lg">
           <Link to="/pricing">{ar ? "ترقية الباقة" : "Upgrade plan"}</Link>
         </Button>
+      </div>
+
+      <div className="mb-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-xl gradient-hero text-primary-foreground">
+              <Wrench className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">{t("pdf_tools_section")}</h2>
+              <p className="text-sm text-muted-foreground">{t("pdf_tools_section_desc")}</p>
+            </div>
+          </div>
+          <Button asChild variant="outline">
+            <Link to="/tools">{t("pdf_view_all_tools")}</Link>
+          </Button>
+        </div>
+        <PdfToolsPreviewGrid limit={4} />
+      </div>
+
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-foreground">{t("sidebar_tools")}</h2>
+        <p className="text-sm text-muted-foreground">{t("features_subtitle")}</p>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

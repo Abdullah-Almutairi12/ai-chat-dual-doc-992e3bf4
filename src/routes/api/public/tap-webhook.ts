@@ -7,8 +7,8 @@ export const Route = createFileRoute("/api/public/tap-webhook")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const raw = await request.text();
-          let payload: Record<string, any> = {};
+        const raw = await request.text();
+        let payload: Record<string, any> = {};
           try {
             payload = raw ? JSON.parse(raw) : {};
           } catch {

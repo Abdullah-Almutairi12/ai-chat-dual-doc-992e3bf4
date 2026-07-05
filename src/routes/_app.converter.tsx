@@ -3,12 +3,15 @@ import { useRef, useState } from "react";
 import { Download, FileType2, LayoutTemplate, ScanText } from "lucide-react";
 import { toast } from "sonner";
 
-import { FileDropzone, LoadingRow, ToolHeader } from "@/components/FileDropzone";
+import { FileDropzone, ToolHeader } from "@/components/FileDropzone";
+import { WorkflowLoader } from "@/components/pdf/WorkflowLoader";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/seo";
 import { useActiveDocument } from "@/lib/active-document";
 import { extractLayout, layoutToHtml, type LayoutProgress } from "@/lib/pdf-layout";
+import { pdfToDocx, pdfToHtml } from "@/lib/pdf/convert";
+import { downloadBlob } from "@/lib/pdf/security";
 
 export const Route = createFileRoute("/_app/converter")({
   head: () =>
@@ -30,21 +33,51 @@ function ConverterTool() {
   const rawFileRef = useRef<File | null>(null);
   const [mode, setMode] = useState<Mode>("word");
   const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState({ percent: 0, stage: "" });
   const [done, setDone] = useState(false);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+  const [resultExt, setResultExt] = useState("docx");
 
   const [layoutHtml, setLayoutHtml] = useState<string | null>(null);
   const [layoutProgress, setLayoutProgress] = useState<LayoutProgress | null>(null);
 
   const preview = doc?.text?.trim() || t("extract_empty");
 
-  const runText = () => {
+  const runWord = async () => {
+    const file = rawFileRef.current;
+    if (!file) return;
     setProcessing(true);
     setDone(false);
-    setTimeout(() => {
-      setProcessing(false);
+    setResultBlob(null);
+    try {
+      const blob = await pdfToDocx(file, (p) => setProgress({ percent: p.percent, stage: p.stage }));
+      setResultBlob(blob);
+      setResultExt("docx");
       setDone(true);
       toast.success(t("convert_done"));
-    }, 500);
+    } catch (err) {
+      console.error("[converter] docx failed", err);
+      toast.error(t("extract_failed"));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const runOcr = async () => {
+    const file = rawFileRef.current;
+    if (!file) return;
+    setProcessing(true);
+    try {
+      const blob = await pdfToHtml(file, (p) => setProgress({ percent: p.percent, stage: p.stage }));
+      setResultBlob(blob);
+      setResultExt("html");
+      setDone(true);
+      toast.success(t("convert_done"));
+    } catch (err) {
+      toast.error(t("extract_failed"));
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const runLayout = async () => {
@@ -73,28 +106,23 @@ function ConverterTool() {
   const run = () => {
     if (!fileName) return;
     if (mode === "layout") void runLayout();
-    else runText();
+    else if (mode === "word") void runWord();
+    else void runOcr();
   };
 
   const download = () => {
+    if (resultBlob) {
+      downloadBlob(resultBlob, `${(fileName ?? "document").replace(/\.\w+$/i, "")}.${resultExt}`);
+      return;
+    }
     const blob = new Blob([preview], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(fileName ?? "document").replace(/\.\w+$/i, "")}.${mode === "word" ? "doc" : "txt"}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `${(fileName ?? "document").replace(/\.\w+$/i, "")}.txt`);
   };
 
   const downloadHtml = () => {
     if (!layoutHtml) return;
     const blob = new Blob([layoutHtml], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(fileName ?? "document").replace(/\.\w+$/i, "")}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `${(fileName ?? "document").replace(/\.\w+$/i, "")}.html`);
   };
 
   const options: { id: Mode; label: string; icon: typeof FileType2 }[] = [
@@ -113,6 +141,7 @@ function ConverterTool() {
           rawFileRef.current = f;
           setDone(false);
           setLayoutHtml(null);
+          setResultBlob(null);
         }}
         accept="application/pdf,.pdf,image/*"
         fileName={fileName}
@@ -174,18 +203,19 @@ function ConverterTool() {
         </Button>
       </div>
 
-      {processing && (
+      {processing && !layoutProgress && (
         <div className="mt-6">
-          <LoadingRow label={t("convert_processing")} />
+          <WorkflowLoader label={t("convert_processing")} percent={progress.percent} stage={progress.stage} />
         </div>
       )}
 
       {layoutProgress && (
         <div className="mt-6">
-          <LoadingRow
+          <WorkflowLoader
             label={`${t("convert_layout_building")} ${
               layoutProgress.pageCount ? `${layoutProgress.page}/${layoutProgress.pageCount}` : ""
-            } · ${layoutProgress.percent}%`}
+            }`}
+            percent={layoutProgress.percent}
           />
         </div>
       )}
@@ -204,6 +234,7 @@ function ConverterTool() {
             title={t("convert_result_title")}
             srcDoc={layoutHtml}
             className="h-[70vh] w-full rounded-xl border border-border bg-muted"
+            sandbox=""
           />
         </div>
       )}
@@ -211,12 +242,13 @@ function ConverterTool() {
       {done && mode !== "layout" && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
           <h3 className="mb-3 text-sm font-semibold text-foreground">{t("convert_result_title")}</h3>
-          <p
-            dir="auto"
-            className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl bg-accent/40 p-4 text-sm leading-relaxed text-foreground"
-          >
-            {preview}
-          </p>
+          {mode === "word" && resultBlob ? (
+            <p className="text-sm text-muted-foreground">{t("pdf_tool_word_desc")}</p>
+          ) : (
+            <p dir="auto" className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl bg-accent/40 p-4 text-sm leading-relaxed text-foreground">
+              {preview}
+            </p>
+          )}
           <Button onClick={download} variant="outline" className="mt-4 gap-2">
             <Download className="h-4 w-4" />
             {t("convert_download")}

@@ -40,7 +40,8 @@ async function tapFetch(path: string, init: RequestInit = {}) {
 }
 
 const WEBHOOK_URL =
-  "https://project--b4f885d5-2337-435a-8cce-f1c4b9bf02fd.lovable.app/api/public/tap-webhook";
+  process.env.TAP_WEBHOOK_URL ||
+  `${process.env.APP_ORIGIN ?? "https://pdfquanta.online"}/api/public/tap-webhook`;
 
 /** Create a hosted checkout charge and return the redirect URL. */
 export async function createTapCharge(opts: {

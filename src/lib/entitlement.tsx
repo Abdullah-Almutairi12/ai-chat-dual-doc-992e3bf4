@@ -75,8 +75,9 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         if (!ent.allowed && mounted.current) setUpgradeOpen(true);
         return ent.allowed;
       } catch {
-        // On unexpected error, do not hard-block the user.
-        return true;
+        // On unexpected error, fail closed — do not grant free processing.
+        if (mounted.current) setUpgradeOpen(true);
+        return false;
       }
     },
     [],

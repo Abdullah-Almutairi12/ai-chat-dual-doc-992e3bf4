@@ -1,10 +1,10 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, FileText } from "lucide-react";
 
-import heroImage from "@/assets/hero.jpg";
 import { Navbar } from "@/components/Navbar";
 import { Logo, LogoIcon } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { PdfToolsPreviewGrid } from "@/components/pdf/PdfToolsHub";
 import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 
@@ -81,13 +81,32 @@ function Landing() {
             <div className="animate-fade-up">
               <div className="relative mx-auto max-w-md lg:max-w-none">
                 <div className="absolute -inset-4 -z-10 rounded-[2rem] gradient-hero opacity-20 blur-2xl" />
-                <img
-                  src={heroImage}
-                  alt="PDF Quanta AI document workspace showing chat, table extraction, and PDF analysis"
-                  className="w-full rounded-3xl border border-border bg-card shadow-elegant"
-                  loading="eager"
-                />
+                <div className="flex aspect-[4/3] w-full items-center justify-center rounded-3xl border border-border bg-gradient-to-br from-card via-accent/30 to-primary/10 shadow-elegant">
+                  <LogoIcon size={120} className="opacity-90 drop-shadow-lg" />
+                </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="pdf-tools" className="border-y border-border bg-muted/30 py-12 sm:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                {t("pdf_tools_section")}
+              </h2>
+              <p className="mt-3 text-muted-foreground">{t("pdf_tools_section_desc")}</p>
+            </div>
+            <div className="mt-10">
+              <PdfToolsPreviewGrid limit={8} />
+            </div>
+            <div className="mt-10 text-center">
+              <Button asChild size="lg" variant="outline" className="gap-2">
+                <Link to="/tools">
+                  {t("pdf_view_all_tools")}
+                  <ArrowRight className={`h-4 w-4 ${arrow}`} />
+                </Link>
+              </Button>
             </div>
           </div>
         </section>

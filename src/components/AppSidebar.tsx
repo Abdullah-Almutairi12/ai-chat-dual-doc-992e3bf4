@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { FileText, LayoutDashboard, LogIn, Shield, Sparkles, Trash2 } from "lucide-react";
+import { FileText, LayoutDashboard, LogIn, Shield, Sparkles, Trash2, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,8 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   useEffect(() => {
     const refresh = () => setDocs(getDocuments());
     refresh();
-    window.addEventListener("documind-docs-changed", refresh);
-    return () => window.removeEventListener("documind-docs-changed", refresh);
+    window.addEventListener("pdfquanta-docs-changed", refresh);
+    return () => window.removeEventListener("pdfquanta-docs-changed", refresh);
   }, []);
 
   const linkClass = (active: boolean) =>
@@ -39,6 +39,11 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Link to="/dashboard" onClick={onNavigate} className={linkClass(pathname === "/dashboard")}>
           <LayoutDashboard className="h-[18px] w-[18px] shrink-0" />
           <span className="truncate">{t("dashboard_title")}</span>
+        </Link>
+
+        <Link to="/tools" onClick={onNavigate} className={linkClass(pathname.startsWith("/tools"))}>
+          <Wrench className="h-[18px] w-[18px] shrink-0" />
+          <span className="truncate">{t("pdf_suite_title")}</span>
         </Link>
 
         <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/50">

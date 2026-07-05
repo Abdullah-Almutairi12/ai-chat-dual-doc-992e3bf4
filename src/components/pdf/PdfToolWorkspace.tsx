@@ -1,0 +1,502 @@
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft, Download, Play } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
+
+import { ToolHeader } from "@/components/FileDropzone";
+import { WorkflowLoader } from "@/components/pdf/WorkflowLoader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/lib/i18n";
+import { getPdfTool, type PdfTool } from "@/lib/pdf-tools";
+import { runConversion, saveConversionResult } from "@/lib/pdf/convert";
+import { addTextToPdf, redactRegions } from "@/lib/pdf/editor";
+import { deletePages, mergePdfs, reorderPages, rotatePages, splitEveryPage } from "@/lib/pdf/organize";
+import { optimizePdf } from "@/lib/pdf/optimize";
+import { protectPdf, removeProtection } from "@/lib/pdf/protect";
+import { downloadBlob, sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/security";
+import { applySignatures, drawSignatureToBytes, typedSignatureToBytes } from "@/lib/pdf/sign";
+import { addWatermark, removeWatermark } from "@/lib/pdf/watermark";
+import { applyAnnotations } from "@/lib/pdf/editor";
+import { useEntitlement } from "@/lib/entitlement";
+import { addDocument } from "@/lib/documents";
+
+type Props = { toolId: string };
+
+export function PdfToolWorkspace({ toolId }: Props) {
+  const tool = getPdfTool(toolId);
+  const { t, dir } = useI18n();
+  const { tryConsume, openUpgrade, entitlement } = useEntitlement();
+  const [files, setFiles] = useState<File[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState({ label: "", percent: 0, stage: "" });
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+  const [resultName, setResultName] = useState("output.pdf");
+
+  // Tool-specific options
+  const [wmText, setWmText] = useState("CONFIDENTIAL");
+  const [wmOpacity, setWmOpacity] = useState(0.3);
+  const [wmRotation, setWmRotation] = useState(-30);
+  const [rotateAngle, setRotateAngle] = useState<90 | 180 | 270>(90);
+  const [deletePageStr, setDeletePageStr] = useState("1");
+  const [protectPass, setProtectPass] = useState("");
+  const [unlockPass, setUnlockPass] = useState("");
+  const [compressLevel, setCompressLevel] = useState<"low" | "medium" | "high">("medium");
+  const [addTextContent, setAddTextContent] = useState("");
+  const [redactPage, setRedactPage] = useState(1);
+  const [reorderStr, setReorderStr] = useState("1,2,3");
+  const sigCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [drawing, setDrawing] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  if (!tool) {
+    return (
+      <div className="mx-auto max-w-lg text-center">
+        <p className="text-muted-foreground">{t("pdf_tool_not_found")}</p>
+        <Button asChild className="mt-4">
+          <Link to="/tools">{t("pdf_back_hub")}</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const uploadKind = (): UploadKind => {
+    if (tool.id === "images-pdf") return "image";
+    if (tool.id === "office-pdf") return "office";
+    if (tool.multiFile && tool.id === "merge") return "pdf";
+    return "pdf";
+  };
+
+  const pickFiles = (list: FileList | null) => {
+    if (!list?.length) return;
+    const picked = Array.from(list);
+    for (const f of picked) {
+      const v = validateUpload(f, { kind: uploadKind() });
+      if (!v.ok) {
+        toast.error(t("invalid_file"));
+        return;
+      }
+    }
+    setFiles(picked);
+    setResultBlob(null);
+  };
+
+  const consumeSlot = async () => {
+    if (entitlement && !entitlement.allowed) {
+      openUpgrade();
+      return false;
+    }
+    const ok = await tryConsume({ fileName: files[0]?.name, fileSize: files[0]?.size, tool: toolId });
+    if (!ok) {
+      toast.error(t("free_limit_reached"));
+      return false;
+    }
+    if (files[0]) addDocument(files[0].name, Math.round(files[0].size / 1024), toolId);
+    return true;
+  };
+
+  const run = useCallback(async () => {
+    if (!files.length) {
+      toast.error(t("invalid_file"));
+      return;
+    }
+    if (!(await consumeSlot())) return;
+
+    setProcessing(true);
+    setProgress({ label: t("pdf_processing"), percent: 5, stage: "" });
+    setResultBlob(null);
+
+    try {
+      const base = sanitizeFileName(files[0].name.replace(/\.\w+$/i, ""));
+
+      if (tool.convertMode) {
+        const result = await runConversion(
+          tool.convertMode,
+          files[0],
+          { imageFiles: files },
+          (p) => setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
+        );
+        if (result.blob) {
+          setResultBlob(result.blob);
+          setResultName(`${base}.${result.ext}`);
+        } else if (result.blobs) {
+          for (const b of result.blobs) downloadBlob(b.blob, b.name);
+          toast.success(t("convert_done"));
+        }
+        setProcessing(false);
+        return;
+      }
+
+      let blob: Blob;
+      switch (tool.id) {
+        case "merge":
+          blob = await mergePdfs(files);
+          setResultName(`${base}-merged.pdf`);
+          break;
+        case "split": {
+          const parts = await splitEveryPage(files[0]);
+          for (const [i, b] of parts.entries()) {
+            downloadBlob(b, `${base}-part-${i + 1}.pdf`);
+          }
+          toast.success(t("convert_done"));
+          setProcessing(false);
+          return;
+        }
+        case "rotate":
+          blob = await rotatePages(files[0], [], rotateAngle);
+          setResultName(`${base}-rotated.pdf`);
+          break;
+        case "delete-pages": {
+          const nums = deletePageStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
+          blob = await deletePages(files[0], nums);
+          setResultName(`${base}-edited.pdf`);
+          break;
+        }
+        case "watermark-add":
+          blob = await addWatermark(files[0], { text: wmText, opacity: wmOpacity, rotation: wmRotation });
+          setResultName(`${base}-watermarked.pdf`);
+          break;
+        case "watermark-remove":
+          blob = await removeWatermark(files[0], (p) =>
+            setProgress({ label: t("pdf_wm_scanning"), percent: p, stage: "" }),
+          );
+          setResultName(`${base}-clean.pdf`);
+          break;
+        case "compress":
+          blob = await optimizePdf(files[0], compressLevel);
+          setResultName(`${base}-optimized.pdf`);
+          break;
+        case "add-text":
+          blob = await addTextToPdf(files[0], [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }]);
+          setResultName(`${base}-edited.pdf`);
+          break;
+        case "redact":
+          blob = await redactRegions(files[0], [
+            { page: redactPage, x: 72, y: 700, width: 200, height: 20 },
+          ]);
+          setResultName(`${base}-redacted.pdf`);
+          break;
+        case "reorder": {
+          const order = reorderStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
+          blob = await reorderPages(files[0], order.length ? order : [1]);
+          setResultName(`${base}-reordered.pdf`);
+          break;
+        }
+        case "annotate":
+          blob = await applyAnnotations(files[0], [
+            { type: "highlight", page: 1, x: 72, y: 700, width: 200, height: 16 },
+          ]);
+          setResultName(`${base}-annotated.pdf`);
+          break;
+        case "stamp": {
+          const bytes = typedSignatureToBytes("STAMP");
+          blob = await applySignatures(files[0], [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }]);
+          setResultName(`${base}-stamped.pdf`);
+          break;
+        }
+        case "sign": {
+          const bytes = signText
+            ? typedSignatureToBytes(signText)
+            : sigCanvasRef.current
+              ? await drawSignatureToBytes(sigCanvasRef.current)
+              : typedSignatureToBytes("Signed");
+          blob = await applySignatures(files[0], [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }]);
+          setResultName(`${base}-signed.pdf`);
+          break;
+        }
+        case "protect":
+          blob = await protectPdf(files[0], { userPassword: protectPass, allowPrinting: false, allowCopying: false });
+          setResultName(`${base}-protected.pdf`);
+          break;
+        case "unlock":
+          blob = await removeProtection(files[0], unlockPass);
+          setResultName(`${base}-unlocked.pdf`);
+          break;
+        default:
+          toast.error(t("pdf_tool_not_found"));
+          setProcessing(false);
+          return;
+      }
+
+      setResultBlob(blob);
+      toast.success(t("convert_done"));
+    } catch (err) {
+      console.error("[PdfToolWorkspace]", err);
+      toast.error(t("extract_failed"));
+    } finally {
+      setProcessing(false);
+    }
+  }, [files, tool, t, wmText, wmOpacity, wmRotation, rotateAngle, deletePageStr, protectPass, unlockPass, compressLevel, addTextContent, redactPage, reorderStr, signText]);
+
+  const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
+    setDrawing(true);
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    const pt = pointer(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pt.x, pt.y);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!drawing) return;
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    const pt = pointer(e, canvas);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  };
+
+  const endDraw = () => setDrawing(false);
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <Link
+        to="/tools"
+        className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className={`h-4 w-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+        {t("pdf_back_hub")}
+      </Link>
+
+      <ToolHeader title={t(tool.titleKey)} desc={t(tool.descKey)} />
+
+      <div
+        className="mt-6 flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:border-primary/40"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          pickFiles(e.dataTransfer.files);
+        }}
+      >
+        <p className="text-sm font-medium text-foreground">{t("dropzone_text")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("dropzone_hint")}</p>
+        {files.length > 0 && (
+          <ul className="mt-4 space-y-1 text-xs text-primary">
+            {files.map((f) => (
+              <li key={f.name}>{f.name}</li>
+            ))}
+          </ul>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept={tool.accept ?? "application/pdf,.pdf"}
+          multiple={tool.multiFile}
+          onChange={(e) => pickFiles(e.target.files)}
+        />
+      </div>
+
+      <ToolOptions
+        tool={tool}
+        wmText={wmText}
+        setWmText={setWmText}
+        wmOpacity={wmOpacity}
+        setWmOpacity={setWmOpacity}
+        wmRotation={wmRotation}
+        setWmRotation={setWmRotation}
+        rotateAngle={rotateAngle}
+        setRotateAngle={setRotateAngle}
+        deletePageStr={deletePageStr}
+        setDeletePageStr={setDeletePageStr}
+        protectPass={protectPass}
+        setProtectPass={setProtectPass}
+        unlockPass={unlockPass}
+        setUnlockPass={setUnlockPass}
+        compressLevel={compressLevel}
+        setCompressLevel={setCompressLevel}
+        addTextContent={addTextContent}
+        setAddTextContent={setAddTextContent}
+        redactPage={redactPage}
+        setRedactPage={setRedactPage}
+        reorderStr={reorderStr}
+        setReorderStr={setReorderStr}
+        signText={signText}
+        setSignText={setSignText}
+        sigCanvasRef={sigCanvasRef}
+        startDraw={startDraw}
+        draw={draw}
+        endDraw={endDraw}
+        t={t}
+      />
+
+      <div className="mt-6 flex justify-end">
+        <Button onClick={() => void run()} disabled={!files.length || processing} className="gap-2">
+          <Play className="h-4 w-4" />
+          {t("pdf_run_tool")}
+        </Button>
+      </div>
+
+      {processing && (
+        <div className="mt-6">
+          <WorkflowLoader label={progress.label} percent={progress.percent} stage={progress.stage} />
+        </div>
+      )}
+
+      {resultBlob && !processing && (
+        <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold">{t("convert_result_title")}</p>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => downloadBlob(resultBlob, resultName)}
+            >
+              <Download className="h-4 w-4" />
+              {t("convert_download")}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{resultName}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolOptions(props: {
+  tool: PdfTool;
+  wmText: string;
+  setWmText: (v: string) => void;
+  wmOpacity: number;
+  setWmOpacity: (v: number) => void;
+  wmRotation: number;
+  setWmRotation: (v: number) => void;
+  rotateAngle: 90 | 180 | 270;
+  setRotateAngle: (v: 90 | 180 | 270) => void;
+  deletePageStr: string;
+  setDeletePageStr: (v: string) => void;
+  protectPass: string;
+  setProtectPass: (v: string) => void;
+  unlockPass: string;
+  setUnlockPass: (v: string) => void;
+  compressLevel: "low" | "medium" | "high";
+  setCompressLevel: (v: "low" | "medium" | "high") => void;
+  addTextContent: string;
+  setAddTextContent: (v: string) => void;
+  redactPage: number;
+  setRedactPage: (v: number) => void;
+  reorderStr: string;
+  setReorderStr: (v: string) => void;
+  signText: string;
+  setSignText: (v: string) => void;
+  sigCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  startDraw: (e: React.MouseEvent | React.TouchEvent) => void;
+  draw: (e: React.MouseEvent | React.TouchEvent) => void;
+  endDraw: () => void;
+  t: (k: import("@/lib/translations").TranslationKey) => string;
+}) {
+  const { tool, t } = props;
+  if (tool.id === "watermark-add") {
+    return (
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <Input value={props.wmText} onChange={(e) => props.setWmText(e.target.value)} placeholder={t("pdf_wm_text")} />
+        <Input type="number" min={0.1} max={1} step={0.1} value={props.wmOpacity} onChange={(e) => props.setWmOpacity(Number(e.target.value))} placeholder={t("pdf_wm_opacity")} />
+        <Input type="number" value={props.wmRotation} onChange={(e) => props.setWmRotation(Number(e.target.value))} placeholder={t("pdf_wm_rotation")} />
+      </div>
+    );
+  }
+  if (tool.id === "rotate") {
+    return (
+      <div className="mt-6 flex gap-2">
+        {([90, 180, 270] as const).map((a) => (
+          <Button key={a} variant={props.rotateAngle === a ? "default" : "outline"} onClick={() => props.setRotateAngle(a)}>
+            {a}°
+          </Button>
+        ))}
+      </div>
+    );
+  }
+  if (tool.id === "delete-pages") {
+    return (
+      <div className="mt-6">
+        <Input value={props.deletePageStr} onChange={(e) => props.setDeletePageStr(e.target.value)} placeholder={t("pdf_pages_to_delete")} />
+      </div>
+    );
+  }
+  if (tool.id === "reorder") {
+    return (
+      <div className="mt-6">
+        <Input value={props.reorderStr} onChange={(e) => props.setReorderStr(e.target.value)} placeholder="1,3,2,4" dir="ltr" />
+      </div>
+    );
+  }
+  if (tool.id === "compress") {
+    return (
+      <div className="mt-6 flex gap-2">
+        {(["low", "medium", "high"] as const).map((l) => (
+          <Button key={l} variant={props.compressLevel === l ? "default" : "outline"} onClick={() => props.setCompressLevel(l)}>
+            {t(l === "low" ? "pdf_compress_low" : l === "medium" ? "pdf_compress_med" : "pdf_compress_high")}
+          </Button>
+        ))}
+      </div>
+    );
+  }
+  if (tool.id === "add-text") {
+    return (
+      <div className="mt-6">
+        <Textarea value={props.addTextContent} onChange={(e) => props.setAddTextContent(e.target.value)} placeholder={t("pdf_add_text_ph")} dir="auto" />
+      </div>
+    );
+  }
+  if (tool.id === "redact") {
+    return (
+      <div className="mt-6">
+        <Input type="number" min={1} value={props.redactPage} onChange={(e) => props.setRedactPage(Number(e.target.value))} placeholder={t("pdf_redact_page")} />
+      </div>
+    );
+  }
+  if (tool.id === "sign") {
+    return (
+      <div className="mt-6 space-y-3">
+        <Input value={props.signText} onChange={(e) => props.setSignText(e.target.value)} placeholder={t("pdf_sign_type")} dir="auto" />
+        <p className="text-xs text-muted-foreground">{t("pdf_sign_draw")}</p>
+        <canvas
+          ref={props.sigCanvasRef}
+          width={400}
+          height={100}
+          className="w-full rounded-xl border border-border bg-white touch-none"
+          onMouseDown={props.startDraw}
+          onMouseMove={props.draw}
+          onMouseUp={props.endDraw}
+          onMouseLeave={props.endDraw}
+          onTouchStart={props.startDraw}
+          onTouchMove={props.draw}
+          onTouchEnd={props.endDraw}
+        />
+      </div>
+    );
+  }
+  if (tool.id === "protect") {
+    return (
+      <div className="mt-6">
+        <Input type="password" value={props.protectPass} onChange={(e) => props.setProtectPass(e.target.value)} placeholder={t("pdf_password")} />
+      </div>
+    );
+  }
+  if (tool.id === "unlock") {
+    return (
+      <div className="mt-6">
+        <Input type="password" value={props.unlockPass} onChange={(e) => props.setUnlockPass(e.target.value)} placeholder={t("pdf_password")} />
+      </div>
+    );
+  }
+  return null;
+}
+
+function pointer(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  if ("touches" in e) {
+    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+  }
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}

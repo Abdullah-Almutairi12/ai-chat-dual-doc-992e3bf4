@@ -17,6 +17,7 @@
  */
 
 import { isRtlText } from "./pdf-extract";
+import { groupIntoLines, joinLineItems, normalizeArabicText, rtlSpanStyle } from "./pdf/bidi";
 
 export type LayoutStage = "loading" | "rendering" | "ocr" | "done";
 
@@ -80,9 +81,9 @@ async function renderCanvas(page: any, viewport: any): Promise<HTMLCanvasElement
   return canvas;
 }
 
-/** Build positioned boxes from a real text layer. */
+/** Build positioned boxes from a real text layer with bidi-correct line grouping. */
 function boxesFromTextLayer(pdfjs: any, content: any, viewport: any): LayoutBox[] {
-  const boxes: LayoutBox[] = [];
+  const raw: { text: string; left: number; top: number; width: number; height: number }[] = [];
   for (const item of content.items) {
     if (!("str" in item) || !item.str || !item.str.trim()) continue;
     const tx = pdfjs.Util.transform(viewport.transform, item.transform);
@@ -90,17 +91,38 @@ function boxesFromTextLayer(pdfjs: any, content: any, viewport: any): LayoutBox[
     const left = tx[4];
     const top = tx[5] - fontHeight;
     const width = (item.width ?? 0) * viewport.scale;
-    boxes.push({
+    raw.push({
+      text: item.str,
       left,
       top,
       width: width || fontHeight * item.str.length * 0.5,
       height: fontHeight,
-      fontSize: fontHeight,
-      text: item.str,
-      rtl: isRtlText(item.str),
+    });
+  }
+  const lines = groupIntoLines(raw);
+  const boxes: LayoutBox[] = [];
+  for (const line of lines) {
+    const text = normalizeArabicText(joinLineItems(line));
+    if (!text) continue;
+    const first = reorderLineForBox(line)[0];
+    const last = reorderLineForBox(line)[reorderLineForBox(line).length - 1];
+    boxes.push({
+      left: Math.min(first.left, last.left),
+      top: first.top,
+      width: Math.max(last.left + last.width - first.left, first.width),
+      height: first.height,
+      fontSize: first.height,
+      text,
+      rtl: isRtlText(text),
     });
   }
   return boxes;
+}
+
+function reorderLineForBox(line: { left: number; top: number; width: number; height: number; text: string }[]) {
+  const text = line.map((i) => i.text).join("");
+  const rtl = isRtlText(text);
+  return [...line].sort((a, b) => (rtl ? b.left - a.left : a.left - b.left));
 }
 
 /** Build positioned boxes from OCR line data. */
@@ -220,8 +242,8 @@ export function layoutToHtml(result: LayoutResult, title: string): string {
             `left:${b.left.toFixed(1)}px;top:${b.top.toFixed(1)}px;` +
             `width:${Math.max(b.width, b.fontSize).toFixed(1)}px;height:${b.height.toFixed(1)}px;` +
             `font-size:${b.fontSize.toFixed(1)}px;line-height:${b.height.toFixed(1)}px;` +
-            `text-align:${b.rtl ? "right" : "left"};`;
-          return `<span class="tb" dir="auto" style="${style}">${escapeHtml(b.text)}</span>`;
+            rtlSpanStyle(b.rtl);
+          return `<span class="tb" dir="${b.rtl ? "rtl" : "ltr"}" style="${style}">${escapeHtml(b.text)}</span>`;
         })
         .join("");
       return (
@@ -244,7 +266,7 @@ export function layoutToHtml(result: LayoutResult, title: string): string {
   .page { position:relative; margin:0 auto 24px; background:#fff; box-shadow:0 6px 24px rgba(0,0,0,.35); max-width:100%; }
   .bg { display:block; width:100%; height:auto; }
   .layer { position:absolute; inset:0; }
-  .tb { position:absolute; color:transparent; white-space:pre; transform-origin:0 0; overflow:hidden; }
+  .tb { position:absolute; color:transparent; white-space:pre; transform-origin:0 0; overflow:hidden; unicode-bidi:isolate; font-family:"Segoe UI","Traditional Arabic",Tahoma,Arial,sans-serif; }
   .tb::selection { background:rgba(70,120,255,.35); }
   @media print {
     body { background:#fff; padding:0; }
