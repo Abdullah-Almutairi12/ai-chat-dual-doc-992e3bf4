@@ -3,10 +3,10 @@ import { loadPdfjs, renderPageToCanvas } from "./loader";
 import { downloadBlob } from "./security";
 import {
   loadDocxModule,
-  loadJsPdfModule,
   loadPptxModule,
   loadXlsxModule,
   requireBrowser,
+  resolveJsPdfConstructor,
 } from "./runtime";
 
 export type ConvertProgress = { stage: string; percent: number; page?: number; pageCount?: number };
@@ -126,7 +126,7 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const pptxModule = await loadPptxModule();
-  const PptxGenJS = pptxModule.default;
+  const PptxGenJS = pptxModule.default as typeof import("pptxgenjs").default;
   onProgress?.({ stage: "render", percent: 5 });
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
@@ -184,8 +184,7 @@ export async function pdfToImages(
 /** Images → PDF via jsPDF. */
 export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
-  const jspdfMod = await loadJsPdfModule();
-  const jsPDF = jspdfMod.jsPDF ?? jspdfMod.default?.jsPDF ?? jspdfMod.default;
+  const jsPDF = await resolveJsPdfConstructor();
   const pdf = new jsPDF({ orientation: "portrait", unit: "pt" });
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -210,8 +209,7 @@ export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promi
 /** Word/Excel → PDF (text-based fallback). */
 export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
-  const jspdfMod = await loadJsPdfModule();
-  const jsPDF = jspdfMod.jsPDF ?? jspdfMod.default?.jsPDF ?? jspdfMod.default;
+  const jsPDF = await resolveJsPdfConstructor();
   onProgress?.({ stage: "read", percent: 20 });
   const text = await extractOfficeText(file);
   const pdf = new jsPDF();

@@ -1,6 +1,10 @@
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { PDFDocument } from "pdf-lib";
 
 import { loadPdfLibModule, requireBrowser } from "./runtime";
+
+/** @deprecated Use PDFDocumentProxy from pdfjs-dist at call sites. */
+export type PdfjsDocument = PDFDocumentProxy;
 
 export async function loadPdfjs() {
   requireBrowser();
@@ -27,13 +31,13 @@ export async function pdfLibToBlob(doc: PDFDocument): Promise<Blob> {
 }
 
 export async function renderPageToCanvas(
-  pdfjsDoc: { getPage: (n: number) => Promise<{ getViewport: (o: { scale: number }) => unknown; render: (o: unknown) => { promise: Promise<void> } }> } },
+  pdfjsDoc: PDFDocumentProxy,
   pageNum: number,
   scale = 2,
 ): Promise<{ canvas: HTMLCanvasElement; width: number; height: number }> {
   requireBrowser();
   const page = await pdfjsDoc.getPage(pageNum);
-  const viewport = page.getViewport({ scale }) as { width: number; height: number; transform: number[] };
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);

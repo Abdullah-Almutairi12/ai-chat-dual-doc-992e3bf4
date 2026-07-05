@@ -31,6 +31,22 @@ export async function loadJsPdfModule() {
   return import("jspdf");
 }
 
+type JsPdfConstructor = typeof import("jspdf").jsPDF;
+
+/** Resolve jsPDF constructor across ESM/CJS export shapes (v3+). */
+export async function resolveJsPdfConstructor(): Promise<JsPdfConstructor> {
+  const mod = await loadJsPdfModule();
+  const modAny = mod as {
+    jsPDF?: JsPdfConstructor;
+    default?: JsPdfConstructor | { jsPDF?: JsPdfConstructor };
+  };
+  const ctor =
+    modAny.jsPDF ??
+    (typeof modAny.default === "function" ? modAny.default : modAny.default?.jsPDF);
+  if (!ctor) throw new Error("jsPDF module export not found");
+  return ctor;
+}
+
 /** Lazy-load pptxgenjs only in the browser. */
 export async function loadPptxModule() {
   requireBrowser();
