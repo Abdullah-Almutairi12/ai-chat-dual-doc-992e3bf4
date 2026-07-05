@@ -56,7 +56,6 @@ export async function createTapCharge(opts: {
       amount: plan.price,
       currency: CURRENCY,
       threeDSecure: true,
-      save_card: true,
       description: `PDF Quanta — ${plan.nameEn} plan`,
       metadata: { user_id: userId, plan_id: plan.id, kind: "subscription" },
       receipt: { email: true, sms: false },
