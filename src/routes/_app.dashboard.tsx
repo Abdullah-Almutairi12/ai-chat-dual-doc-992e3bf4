@@ -6,8 +6,16 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 import { supabase } from "@/integrations/supabase/client";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/dashboard")({
+  head: () =>
+    pageHead({
+      path: "/dashboard",
+      title: "Dashboard — All Your AI PDF Tools | PDF Quanta",
+      description:
+        "Access every PDF Quanta tool in one place: chat with PDFs, extract tables, proofread, convert, generate quizzes, and analyze documents.",
+    }),
   component: Dashboard,
 });
 

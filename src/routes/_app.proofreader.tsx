@@ -6,8 +6,16 @@ import { toast } from "sonner";
 import { LoadingRow, ToolHeader } from "@/components/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/proofreader")({
+  head: () =>
+    pageHead({
+      path: "/proofreader",
+      title: "AI PDF Proofreader — Grammar & Style Check | PDF Quanta",
+      description:
+        "Fix spelling, grammar, and style in your PDFs and documents. PDF Quanta's bilingual AI proofreader rewrites text clearly in English and Arabic.",
+    }),
   component: ProofreaderTool,
 });
 

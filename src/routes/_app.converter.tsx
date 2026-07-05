@@ -6,8 +6,16 @@ import { toast } from "sonner";
 import { FileDropzone, LoadingRow, ToolHeader } from "@/components/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/converter")({
+  head: () =>
+    pageHead({
+      path: "/converter",
+      title: "PDF Converter & OCR — PDF to Word | PDF Quanta",
+      description:
+        "Convert PDFs to editable Word documents and extract text from scans with OCR. Fast, accurate PDF conversion for English and Arabic files.",
+    }),
   component: ConverterTool,
 });
 

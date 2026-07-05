@@ -6,8 +6,16 @@ import { FileDropzone, ToolHeader } from "@/components/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { mockAnswer } from "@/lib/documents";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/chat")({
+  head: () =>
+    pageHead({
+      path: "/chat",
+      title: "Chat with PDF — AI PDF Assistant | PDF Quanta",
+      description:
+        "Ask questions and get instant answers from any PDF. PDF Quanta's bilingual AI PDF chat summarizes, explains, and finds facts across your documents.",
+    }),
   component: ChatTool,
 });
 

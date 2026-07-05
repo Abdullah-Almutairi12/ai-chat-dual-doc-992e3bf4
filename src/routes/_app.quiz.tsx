@@ -5,8 +5,16 @@ import { CheckCircle2, RotateCcw, Sparkles, XCircle } from "lucide-react";
 import { FileDropzone, LoadingRow, ToolHeader } from "@/components/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/quiz")({
+  head: () =>
+    pageHead({
+      path: "/quiz",
+      title: "PDF Quiz Generator — Create Quizzes from PDFs | PDF Quanta",
+      description:
+        "Turn any PDF into a ready-to-use quiz. PDF Quanta's AI generates multiple-choice and true/false questions from your documents in seconds.",
+    }),
   component: QuizTool,
 });
 
