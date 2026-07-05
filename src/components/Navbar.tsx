@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Languages, LayoutDashboard, LogOut, User as UserIcon } from "lucide-react";
+import { Languages, LayoutDashboard, LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
