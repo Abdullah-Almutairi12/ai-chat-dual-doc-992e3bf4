@@ -68,6 +68,20 @@ const en = {
   chat_empty_desc: "Try “Summarize this document” or “What are the key takeaways?”",
   chat_send: "Send",
 
+  // extraction / OCR
+  extracting: "Extracting text…",
+  ocr_running: "Reading scanned pages with OCR…",
+  extract_failed: "Couldn't read this document. Please try another file.",
+  extract_empty: "No readable text was found in this document.",
+  ocr_badge: "Text recovered via OCR",
+  text_layer_badge: "Text extracted",
+  pages_label: "pages",
+  summary_generating: "Generating summary…",
+  chat_need_login: "Please sign in to chat with your document.",
+  chat_rate_limit: "Too many requests — please wait a moment and try again.",
+  chat_no_credits: "AI credits are exhausted. Please add credits to continue.",
+  chat_error: "Something went wrong. Please try again.",
+
   // tables tool
   tables_detected: "Detected tables",
   tables_scan: "Scanning document for tables…",
@@ -203,6 +217,19 @@ const ar: Record<keyof typeof en, string> = {
   chat_empty_title: "اطرح سؤالك الأول",
   chat_empty_desc: "جرّب «لخّص هذا المستند» أو «ما هي النقاط الأساسية؟»",
   chat_send: "إرسال",
+
+  extracting: "جارٍ استخراج النص…",
+  ocr_running: "جارٍ قراءة الصفحات الممسوحة عبر OCR…",
+  extract_failed: "تعذّر قراءة هذا المستند. الرجاء تجربة ملف آخر.",
+  extract_empty: "لم يتم العثور على نص قابل للقراءة في هذا المستند.",
+  ocr_badge: "تم استخراج النص عبر OCR",
+  text_layer_badge: "تم استخراج النص",
+  pages_label: "صفحات",
+  summary_generating: "جارٍ إنشاء الملخص…",
+  chat_need_login: "الرجاء تسجيل الدخول للدردشة مع مستندك.",
+  chat_rate_limit: "طلبات كثيرة — الرجاء الانتظار قليلاً ثم المحاولة مجددًا.",
+  chat_no_credits: "انتهى رصيد الذكاء الاصطناعي. الرجاء إضافة رصيد للمتابعة.",
+  chat_error: "حدث خطأ ما. الرجاء المحاولة مرة أخرى.",
 
   tables_detected: "الجداول المكتشفة",
   tables_scan: "جارٍ فحص المستند بحثًا عن الجداول…",
