@@ -192,6 +192,18 @@ const ar: Record<keyof typeof en, string> = {
   nav_pricing: "الباقات",
   nav_account: "الحساب",
   nav_logout: "تسجيل الخروج",
+  free_trial_remaining: "المحاولات المجانية المتبقية",
+  free_trial_used: "تم استخدام التجربة المجانية",
+  free_trial_unlimited: "وصول غير محدود",
+  upgrade_modal_title: "لقد استخدمت ملفك المجاني",
+  upgrade_modal_desc:
+    "تشمل تجربتك المجانية ملف PDF واحدًا كاملًا — المحادثة والجداول والتدقيق والمزيد. قم بالترقية إلى باقة لمواصلة معالجة مستندات غير محدودة.",
+  upgrade_modal_perk_1: "معالجة عدد غير محدود من ملفات PDF شهريًا",
+  upgrade_modal_perk_2: "وصول كامل إلى جميع أدوات الذكاء الاصطناعي",
+  upgrade_modal_perk_3: "معالجة ذات أولوية ودفع آمن عبر Tap",
+  upgrade_modal_cta: "الترقية الآن",
+  upgrade_modal_later: "ربما لاحقًا",
+  free_limit_reached: "لقد استخدمت ملفك المجاني. قم بالترقية للمتابعة.",
 
   hero_badge: "مدعوم بالذكاء الاصطناعي · ثنائي اللغة",
   hero_title: "مساحة عملك الذكية للمستندات",
