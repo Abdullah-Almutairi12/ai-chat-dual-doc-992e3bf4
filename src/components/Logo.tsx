@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type LogoProps = {
