@@ -6,6 +6,8 @@ import { useI18n } from "@/lib/i18n";
 import { addDocument } from "@/lib/documents";
 import { extractDocument, type ExtractProgress } from "@/lib/pdf-extract";
 import { useActiveDocument, type ActiveDocument } from "@/lib/active-document";
+import { useEntitlement } from "@/lib/entitlement";
+import { FreeCreditBadge } from "@/components/FreeCreditBadge";
 
 type Props = {
   tool: string;
@@ -25,6 +27,7 @@ export function FileDropzone({
 }: Props) {
   const { t } = useI18n();
   const { setDoc } = useActiveDocument();
+  const { entitlement, tryConsume, openUpgrade } = useEntitlement();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<ExtractProgress | null>(null);
@@ -32,9 +35,22 @@ export function FileDropzone({
   const handle = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
+    // Fast pre-check: if the free trial is already exhausted, prompt to upgrade
+    // before spending time on extraction.
+    if (entitlement && !entitlement.allowed) {
+      openUpgrade();
+      return;
+    }
     setProgress({ stage: "loading", page: 0, pageCount: 0, percent: 0 });
     try {
       const result = await extractDocument(file, setProgress);
+      // Server-enforced, atomic consumption of one processing slot.
+      const ok = await tryConsume({ fileName: file.name, fileSize: file.size, tool });
+      if (!ok) {
+        // tryConsume already opened the upgrade modal.
+        toast.error(t("free_limit_reached"));
+        return;
+      }
       const doc: ActiveDocument = {
         ...result,
         name: file.name,
@@ -137,6 +153,9 @@ export function FileDropzone({
       </span>
       <p className="mt-6 max-w-sm text-lg font-medium text-foreground">{t("dropzone_text")}</p>
       <p className="mt-2 text-sm text-muted-foreground">{t("dropzone_hint")}</p>
+      <div className="mt-4">
+        <FreeCreditBadge />
+      </div>
       <input
         ref={inputRef}
         type="file"

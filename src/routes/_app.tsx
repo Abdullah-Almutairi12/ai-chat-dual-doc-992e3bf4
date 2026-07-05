@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useI18n } from "@/lib/i18n";
 import { ActiveDocumentProvider } from "@/lib/active-document";
+import { EntitlementProvider } from "@/lib/entitlement";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -18,6 +20,7 @@ function AppLayout() {
   const side = dir === "rtl" ? "right" : "left";
 
   return (
+    <EntitlementProvider>
     <ActiveDocumentProvider>
     <div className="flex min-h-screen w-full bg-background">
       {/* Desktop sidebar */}
@@ -63,5 +66,7 @@ function AppLayout() {
       </div>
     </div>
     </ActiveDocumentProvider>
+    <UpgradeModal />
+    </EntitlementProvider>
   );
 }

@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 import { supabase } from "@/integrations/supabase/client";
 import { pageHead } from "@/lib/seo";
+import { FreeCreditBadge } from "@/components/FreeCreditBadge";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () =>
@@ -59,6 +60,9 @@ function Dashboard() {
             <p className="text-2xl font-bold text-foreground">
               {credits === null ? "—" : credits.toLocaleString()}
             </p>
+            <div className="mt-2">
+              <FreeCreditBadge />
+            </div>
           </div>
         </div>
         <Button asChild size="lg">

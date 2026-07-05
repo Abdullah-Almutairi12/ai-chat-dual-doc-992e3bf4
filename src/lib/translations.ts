@@ -15,6 +15,18 @@ const en = {
   nav_pricing: "Pricing",
   nav_account: "Account",
   nav_logout: "Sign out",
+  free_trial_remaining: "Free Credits Remaining",
+  free_trial_used: "Free trial used",
+  free_trial_unlimited: "Unlimited access",
+  upgrade_modal_title: "You've used your free file",
+  upgrade_modal_desc:
+    "Your free trial includes one complete PDF — chat, tables, proofreading and more. Upgrade to a plan to keep processing unlimited documents.",
+  upgrade_modal_perk_1: "Process unlimited PDFs every month",
+  upgrade_modal_perk_2: "Full access to every AI tool",
+  upgrade_modal_perk_3: "Priority processing & secure payments via Tap",
+  upgrade_modal_cta: "Upgrade now",
+  upgrade_modal_later: "Maybe later",
+  free_limit_reached: "You've used your free file. Upgrade to continue.",
 
   // hero
   hero_badge: "AI-powered · Bilingual",
@@ -180,6 +192,18 @@ const ar: Record<keyof typeof en, string> = {
   nav_pricing: "الباقات",
   nav_account: "الحساب",
   nav_logout: "تسجيل الخروج",
+  free_trial_remaining: "المحاولات المجانية المتبقية",
+  free_trial_used: "تم استخدام التجربة المجانية",
+  free_trial_unlimited: "وصول غير محدود",
+  upgrade_modal_title: "لقد استخدمت ملفك المجاني",
+  upgrade_modal_desc:
+    "تشمل تجربتك المجانية ملف PDF واحدًا كاملًا — المحادثة والجداول والتدقيق والمزيد. قم بالترقية إلى باقة لمواصلة معالجة مستندات غير محدودة.",
+  upgrade_modal_perk_1: "معالجة عدد غير محدود من ملفات PDF شهريًا",
+  upgrade_modal_perk_2: "وصول كامل إلى جميع أدوات الذكاء الاصطناعي",
+  upgrade_modal_perk_3: "معالجة ذات أولوية ودفع آمن عبر Tap",
+  upgrade_modal_cta: "الترقية الآن",
+  upgrade_modal_later: "ربما لاحقًا",
+  free_limit_reached: "لقد استخدمت ملفك المجاني. قم بالترقية للمتابعة.",
 
   hero_badge: "مدعوم بالذكاء الاصطناعي · ثنائي اللغة",
   hero_title: "مساحة عملك الذكية للمستندات",
