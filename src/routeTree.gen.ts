@@ -26,6 +26,8 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConverterRouteImport } from './routes/_app.converter'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
+import { Route as AppToolsRouteImport } from './routes/_app.tools'
+import { Route as AppToolsToolIdRouteImport } from './routes/_app.tools.$toolId'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
 import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
@@ -118,6 +120,16 @@ const AppAnalyzerRoute = AppAnalyzerRouteImport.update({
   path: '/analyzer',
   getParentRoute: () => AppRoute,
 } as any)
+const AppToolsRoute = AppToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppToolsToolIdRoute = AppToolsToolIdRouteImport.update({
+  id: '/$toolId',
+  path: '/$toolId',
+  getParentRoute: () => AppToolsRoute,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -175,6 +187,8 @@ export interface FileRoutesByFullPath {
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
+  '/tools': typeof AppToolsRouteWithChildren
+  '/tools/$toolId': typeof AppToolsToolIdRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
@@ -200,6 +214,8 @@ export interface FileRoutesByTo {
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
+  '/tools': typeof AppToolsRouteWithChildren
+  '/tools/$toolId': typeof AppToolsToolIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
@@ -227,6 +243,8 @@ export interface FileRoutesById {
   '/_app/proofreader': typeof AppProofreaderRoute
   '/_app/quiz': typeof AppQuizRoute
   '/_app/tables': typeof AppTablesRoute
+  '/_app/tools': typeof AppToolsRouteWithChildren
+  '/_app/tools/$toolId': typeof AppToolsToolIdRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
@@ -254,6 +272,8 @@ export interface FileRouteTypes {
     | '/proofreader'
     | '/quiz'
     | '/tables'
+    | '/tools'
+    | '/tools/$toolId'
     | '/admin'
     | '/payment/callback'
     | '/payment/mock'
@@ -279,6 +299,8 @@ export interface FileRouteTypes {
     | '/proofreader'
     | '/quiz'
     | '/tables'
+    | '/tools'
+    | '/tools/$toolId'
     | '/payment/callback'
     | '/payment/mock'
     | '/admin/documents'
@@ -305,6 +327,8 @@ export interface FileRouteTypes {
     | '/_app/proofreader'
     | '/_app/quiz'
     | '/_app/tables'
+    | '/_app/tools'
+    | '/_app/tools/$toolId'
     | '/_authenticated/admin'
     | '/payment/callback'
     | '/payment/mock'
@@ -454,6 +478,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyzerRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/tools': {
+      id: '/_app/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof AppToolsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tools/$toolId': {
+      id: '/_app/tools/$toolId'
+      path: '/$toolId'
+      fullPath: '/tools/$toolId'
+      preLoaderRoute: typeof AppToolsToolIdRouteImport
+      parentRoute: typeof AppToolsRoute
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
@@ -543,6 +581,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AppToolsRouteChildren {
+  AppToolsToolIdRoute: typeof AppToolsToolIdRoute
+}
+
+const AppToolsRouteChildren: AppToolsRouteChildren = {
+  AppToolsToolIdRoute: AppToolsToolIdRoute,
+}
+
+const AppToolsRouteWithChildren = AppToolsRoute._addFileChildren(AppToolsRouteChildren)
+
 interface AppRouteChildren {
   AppAnalyzerRoute: typeof AppAnalyzerRoute
   AppChatRoute: typeof AppChatRoute
@@ -551,6 +599,7 @@ interface AppRouteChildren {
   AppProofreaderRoute: typeof AppProofreaderRoute
   AppQuizRoute: typeof AppQuizRoute
   AppTablesRoute: typeof AppTablesRoute
+  AppToolsRoute: typeof AppToolsRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -561,6 +610,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProofreaderRoute: AppProofreaderRoute,
   AppQuizRoute: AppQuizRoute,
   AppTablesRoute: AppTablesRoute,
+  AppToolsRoute: AppToolsRouteWithChildren,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

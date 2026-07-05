@@ -50,7 +50,6 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
       children.push(
         new Paragraph({
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
-          bidirectional: rtl,
           children: [
             new TextRun({
               text,
@@ -127,7 +126,7 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const pptxModule = await loadPptxModule();
-  const PptxGenJS = (pptxModule as { default: new () => { layout: string; addSlide: () => { addImage: (o: object) => void }; write: (o: object) => Promise<Blob> } } }).default;
+  const PptxGenJS = pptxModule.default;
   onProgress?.({ stage: "render", percent: 5 });
   const pdfjs = await loadPdfjs();
   const buf = await file.arrayBuffer();
@@ -185,7 +184,8 @@ export async function pdfToImages(
 /** Images → PDF via jsPDF. */
 export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
-  const { jsPDF } = await loadJsPdfModule();
+  const jspdfMod = await loadJsPdfModule();
+  const jsPDF = jspdfMod.jsPDF ?? jspdfMod.default?.jsPDF ?? jspdfMod.default;
   const pdf = new jsPDF({ orientation: "portrait", unit: "pt" });
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -210,7 +210,8 @@ export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promi
 /** Word/Excel → PDF (text-based fallback). */
 export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
-  const { jsPDF } = await loadJsPdfModule();
+  const jspdfMod = await loadJsPdfModule();
+  const jsPDF = jspdfMod.jsPDF ?? jspdfMod.default?.jsPDF ?? jspdfMod.default;
   onProgress?.({ stage: "read", percent: 20 });
   const text = await extractOfficeText(file);
   const pdf = new jsPDF();

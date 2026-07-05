@@ -38,6 +38,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
   const [addTextContent, setAddTextContent] = useState("");
   const [redactPage, setRedactPage] = useState(1);
   const [reorderStr, setReorderStr] = useState("1,2,3");
+  const [signText, setSignText] = useState("");
   const sigCanvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 
