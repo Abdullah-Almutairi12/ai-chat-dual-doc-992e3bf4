@@ -12,6 +12,7 @@ import { useActiveDocument } from "@/lib/active-document";
 import { askDocument } from "@/lib/chat.functions";
 import { isRtlText } from "@/lib/pdf-extract";
 import { supabase } from "@/integrations/supabase/client";
+import type { TranslationKey } from "@/lib/translations";
 
 export const Route = createFileRoute("/_app/chat")({
   head: () =>
@@ -26,12 +27,12 @@ export const Route = createFileRoute("/_app/chat")({
 
 type Msg = { id: string; role: "user" | "assistant"; text: string };
 
-function mapError(err: unknown, t: (k: never) => string): string {
+function mapError(err: unknown, t: (k: TranslationKey) => string): string {
   const msg = err instanceof Error ? err.message : String(err);
-  if (msg.includes("RATE_LIMIT")) return t("chat_rate_limit" as never);
-  if (msg.includes("NO_CREDITS")) return t("chat_no_credits" as never);
-  if (msg.includes("Unauthorized")) return t("chat_need_login" as never);
-  return t("chat_error" as never);
+  if (msg.includes("RATE_LIMIT")) return t("chat_rate_limit");
+  if (msg.includes("NO_CREDITS")) return t("chat_no_credits");
+  if (msg.includes("Unauthorized")) return t("chat_need_login");
+  return t("chat_error");
 }
 
 function ChatTool() {
