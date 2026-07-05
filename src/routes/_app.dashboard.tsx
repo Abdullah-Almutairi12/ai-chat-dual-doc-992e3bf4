@@ -75,7 +75,7 @@ function Dashboard() {
             style={{ animationDelay: `${i * 50}ms` }}
           >
             <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary transition-colors group-hover:gradient-hero group-hover:text-primary-foreground">
-              <tool.icon className="h-6 w-6" />
+              <tool.icon className="h-6 w-6" role="img" aria-label={`${t(tool.titleKey)} tool icon`} />
             </span>
             <h3 className="mt-4 text-lg font-semibold text-foreground">{t(tool.titleKey)}</h3>
             <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{t(tool.descKey)}</p>
