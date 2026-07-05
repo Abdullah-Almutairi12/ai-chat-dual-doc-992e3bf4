@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { translations, type Lang, type TranslationKey } from "./translations";
+import { detectCountryLang } from "./geo.functions";
 
 type I18nContextValue = {
   lang: Lang;
@@ -26,16 +27,6 @@ function applyDocument(lang: Lang) {
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
 }
 
-/** Detect the user's preferred language from the browser. Arabic → "ar", everything else → "en". */
-function detectBrowserLang(): Lang {
-  if (typeof navigator === "undefined") return "en";
-  const candidates = [
-    ...(navigator.languages ?? []),
-    navigator.language,
-  ].filter(Boolean) as string[];
-  return candidates.some((l) => l.toLowerCase().startsWith("ar")) ? "ar" : "en";
-}
-
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
 
@@ -43,14 +34,31 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const stored = (typeof window !== "undefined" &&
       window.localStorage.getItem(STORAGE_KEY)) as Lang | null;
     if (stored === "ar" || stored === "en") {
+      // A saved manual choice always wins over IP detection.
       setLangState(stored);
       applyDocument(stored);
-    } else {
-      // No saved choice yet: fall back to the browser's preferred language.
-      const detected = detectBrowserLang();
-      setLangState(detected);
-      applyDocument(detected);
+      return;
     }
+
+    // No saved choice yet: detect the visitor's country by IP and default the
+    // language accordingly (Arab country → Arabic, otherwise English).
+    let active = true;
+    applyDocument("en"); // sensible default while detection resolves
+    detectCountryLang()
+      .then((res) => {
+        if (!active) return;
+        // Don't override a choice the user made while detection was in flight.
+        const latest = window.localStorage.getItem(STORAGE_KEY);
+        if (latest === "ar" || latest === "en") return;
+        setLangState(res.lang);
+        applyDocument(res.lang);
+      })
+      .catch(() => {
+        // Detection failed → stay on English default.
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const setLang = (next: Lang) => {
