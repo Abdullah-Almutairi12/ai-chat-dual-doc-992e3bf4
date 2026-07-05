@@ -6,8 +6,16 @@ import { toast } from "sonner";
 import { FileDropzone, LoadingRow, ToolHeader } from "@/components/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/tables")({
+  head: () =>
+    pageHead({
+      path: "/tables",
+      title: "PDF to Excel — Extract Tables from PDF | PDF Quanta",
+      description:
+        "Extract tables from any PDF and export clean, structured data to Excel or CSV. PDF Quanta detects rows and columns automatically with AI.",
+    }),
   component: TablesTool,
 });
 

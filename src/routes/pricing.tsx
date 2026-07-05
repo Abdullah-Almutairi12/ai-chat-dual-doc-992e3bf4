@@ -24,7 +24,11 @@ export const Route = createFileRoute("/pricing")({
       { property: "og:title", content: "Pricing — PDF Quanta" },
       { property: "og:description", content: "Flexible monthly credit packages for PDF Quanta." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pdfquanta.online/pricing" },
+      { property: "og:image", content: "https://pdfquanta.online/og-image.jpg" },
+      { name: "twitter:image", content: "https://pdfquanta.online/og-image.jpg" },
     ],
+    links: [{ rel: "canonical", href: "https://pdfquanta.online/pricing" }],
   }),
   component: PricingPage,
 });

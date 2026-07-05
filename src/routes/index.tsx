@@ -11,13 +11,24 @@ import { tools } from "@/lib/tools";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PDF Quanta — The Quantum Leap in Document Intelligence" },
+      { title: "PDF Quanta — AI PDF Tools: Chat, Convert & Analyze PDFs" },
       {
         name: "description",
         content:
-          "Chat with PDFs, extract tables to Excel, proofread, convert, generate quizzes, and analyze financial or legal documents in one bilingual AI suite.",
+          "PDF Quanta is a bilingual AI PDF suite: chat with PDFs, extract tables to Excel, proofread, convert to Word, generate quizzes, and analyze documents.",
       },
+      { property: "og:title", content: "PDF Quanta — AI PDF Tools: Chat, Convert & Analyze PDFs" },
+      {
+        property: "og:description",
+        content:
+          "Chat with PDFs, extract tables to Excel, proofread, convert to Word, generate quizzes, and analyze financial or legal documents in one AI suite.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pdfquanta.online/" },
+      { property: "og:image", content: "https://pdfquanta.online/og-image.jpg" },
+      { name: "twitter:image", content: "https://pdfquanta.online/og-image.jpg" },
     ],
+    links: [{ rel: "canonical", href: "https://pdfquanta.online/" }],
   }),
   component: Landing,
 });
@@ -72,7 +83,7 @@ function Landing() {
                 <div className="absolute -inset-4 -z-10 rounded-[2rem] gradient-hero opacity-20 blur-2xl" />
                 <img
                   src={heroImage}
-                  alt={t("hero_title")}
+                  alt="PDF Quanta AI document workspace showing chat, table extraction, and PDF analysis"
                   className="w-full rounded-3xl border border-border bg-card shadow-elegant"
                   loading="eager"
                 />
@@ -98,7 +109,7 @@ function Landing() {
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary transition-colors group-hover:gradient-hero group-hover:text-primary-foreground">
-                  <tool.icon className="h-6 w-6" />
+                  <tool.icon className="h-6 w-6" role="img" aria-label={`${t(tool.titleKey)} tool icon`} />
                 </span>
                 <h3 className="mt-4 text-lg font-semibold text-foreground">{t(tool.titleKey)}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t(tool.descKey)}</p>

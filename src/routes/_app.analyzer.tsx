@@ -5,8 +5,16 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 
 import { FileDropzone, LoadingRow, ToolHeader } from "@/components/FileDropzone";
 import { useI18n } from "@/lib/i18n";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/analyzer")({
+  head: () =>
+    pageHead({
+      path: "/analyzer",
+      title: "PDF Analyzer — Financial & Legal Document AI | PDF Quanta",
+      description:
+        "Analyze financial and legal PDFs with AI. PDF Quanta surfaces key figures, risks, and insights with clear charts and summaries.",
+    }),
   component: AnalyzerTool,
 });
 

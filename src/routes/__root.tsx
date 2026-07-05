@@ -95,6 +95,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "PDF Quanta is a bilingual AI document suite for chat, tables, proofreading, conversion, quizzes, and financial/legal analysis.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "PDF Quanta" },
+      { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
     ],

@@ -6,8 +6,16 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 import { supabase } from "@/integrations/supabase/client";
+import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/_app/dashboard")({
+  head: () =>
+    pageHead({
+      path: "/dashboard",
+      title: "Dashboard — All Your AI PDF Tools | PDF Quanta",
+      description:
+        "Access every PDF Quanta tool in one place: chat with PDFs, extract tables, proofread, convert, generate quizzes, and analyze documents.",
+    }),
   component: Dashboard,
 });
 
@@ -67,7 +75,7 @@ function Dashboard() {
             style={{ animationDelay: `${i * 50}ms` }}
           >
             <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary transition-colors group-hover:gradient-hero group-hover:text-primary-foreground">
-              <tool.icon className="h-6 w-6" />
+              <tool.icon className="h-6 w-6" role="img" aria-label={`${t(tool.titleKey)} tool icon`} />
             </span>
             <h3 className="mt-4 text-lg font-semibold text-foreground">{t(tool.titleKey)}</h3>
             <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{t(tool.descKey)}</p>
