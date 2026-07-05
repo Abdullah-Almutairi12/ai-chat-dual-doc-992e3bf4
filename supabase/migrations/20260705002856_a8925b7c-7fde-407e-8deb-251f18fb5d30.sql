@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.notify_new_user_welcome() FROM PUBLIC, anon, authenticated;
