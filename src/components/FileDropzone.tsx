@@ -153,6 +153,9 @@ export function FileDropzone({
       </span>
       <p className="mt-6 max-w-sm text-lg font-medium text-foreground">{t("dropzone_text")}</p>
       <p className="mt-2 text-sm text-muted-foreground">{t("dropzone_hint")}</p>
+      <div className="mt-4">
+        <FreeCreditBadge />
+      </div>
       <input
         ref={inputRef}
         type="file"
