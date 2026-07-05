@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
@@ -9,12 +9,19 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { CURRENCY, getPlan } from "@/lib/packages";
 import { supabase } from "@/integrations/supabase/client";
-import { confirmMock } from "@/lib/checkout.functions";
+import { confirmMock, isLiveMode } from "@/lib/checkout.functions";
 
 export const Route = createFileRoute("/payment/mock")({
   validateSearch: (search: Record<string, unknown>) => ({
     cid: typeof search.cid === "string" ? search.cid : undefined,
   }),
+  beforeLoad: async () => {
+    // The simulated checkout page must never be reachable in live mode.
+    const live = await isLiveMode();
+    if (live) {
+      throw redirect({ to: "/pricing" });
+    }
+  },
   component: MockCheckout,
 });
 
