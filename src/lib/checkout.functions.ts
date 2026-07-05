@@ -63,13 +63,14 @@ export const claimFree = createServerFn({ method: "POST" })
 
 /** Verify a charge after redirect and fulfill it idempotently. */
 export const verifyCharge = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { tapId: string }) => {
     if (!data?.tapId || typeof data.tapId !== "string") throw new Error("Missing charge id");
     return data;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { fulfillCharge } = await import("./tap.server");
-    return fulfillCharge(data.tapId);
+    return fulfillCharge(data.tapId, { expectedUserId: context.userId });
   });
 
 /** Current user's active subscription + credit balance. */

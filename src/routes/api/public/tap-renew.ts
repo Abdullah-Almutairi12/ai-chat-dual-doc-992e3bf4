@@ -6,8 +6,9 @@ export const Route = createFileRoute("/api/public/tap-renew")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey");
-        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+        const { verifyCronSecret } = await import("@/lib/cron-auth.server");
+
+        if (!verifyCronSecret(request)) {
           return new Response("Unauthorized", { status: 401 });
         }
 

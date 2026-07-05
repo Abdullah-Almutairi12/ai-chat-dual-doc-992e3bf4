@@ -1,5 +1,7 @@
 // Server-only Tap Payments integration. Never import this from a route file or
 // component; only from server function/route handlers (dynamic import).
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { BILLING_INTERVAL_DAYS, CURRENCY, getPlan, type Plan } from "./packages";
 
@@ -42,6 +44,78 @@ async function tapFetch(path: string, init: RequestInit = {}) {
 const WEBHOOK_URL =
   process.env.TAP_WEBHOOK_URL ||
   `${process.env.APP_ORIGIN ?? "https://pdfquanta.online"}/api/public/tap-webhook`;
+
+/** ISO decimal places for Tap hashstring amount formatting. */
+const TAP_CURRENCY_DECIMALS: Record<string, number> = {
+  SAR: 2,
+  USD: 2,
+  EUR: 2,
+  GBP: 2,
+  AED: 2,
+  QAR: 2,
+  EGP: 2,
+  BHD: 3,
+  KWD: 3,
+  OMR: 3,
+  JOD: 3,
+};
+
+function formatTapAmount(amount: unknown, currency: unknown): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return String(amount ?? "");
+  const code = String(currency ?? CURRENCY).toUpperCase();
+  const decimals = TAP_CURRENCY_DECIMALS[code] ?? 2;
+  return n.toFixed(decimals);
+}
+
+type TapWebhookPayload = {
+  id?: string;
+  object?: string;
+  amount?: number | string;
+  currency?: string;
+  status?: string;
+  reference?: { gateway?: string; payment?: string };
+  transaction?: { created?: string | number };
+  updated?: string | number;
+  created?: string | number;
+};
+
+/**
+ * Validate Tap webhook authenticity via the hashstring header.
+ * @see https://developers.tap.company/docs/webhook
+ */
+export function verifyTapWebhookHash(
+  payload: TapWebhookPayload | Record<string, unknown>,
+  hashHeader: string | null,
+): boolean {
+  const body = payload as TapWebhookPayload;
+  if (!hashHeader?.trim()) return false;
+
+  const id = String(body.id ?? "");
+  const amount = formatTapAmount(body.amount, body.currency);
+  const currency = String(body.currency ?? "");
+  const gatewayReference = String(body.reference?.gateway ?? "");
+  const paymentReference = String(body.reference?.payment ?? "");
+  const status = String(body.status ?? "");
+
+  const objectType = String(body.object ?? "charge");
+  const isInvoice = objectType === "invoice";
+  const updated = String(body.updated ?? "");
+  const created = String(
+    body.transaction?.created ?? body.created ?? "",
+  );
+
+  const toBeHashed = isInvoice
+    ? `x_id${id}x_amount${amount}x_currency${currency}x_updated${updated}x_status${status}x_created${created}`
+    : `x_id${id}x_amount${amount}x_currency${currency}x_gateway_reference${gatewayReference}x_payment_reference${paymentReference}x_status${status}x_created${created}`;
+
+  const computed = createHmac("sha256", tapKey()).update(toBeHashed).digest("hex");
+  const received = hashHeader.trim().toLowerCase();
+  const expected = computed.toLowerCase();
+
+  if (received.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(received), Buffer.from(expected));
+}
 
 /** Create a hosted checkout charge and return the redirect URL. */
 export async function createTapCharge(opts: {
@@ -199,22 +273,33 @@ async function fulfillFromMeta(args: {
   return { ...result, fulfilled: true };
 }
 
+export type FulfillOptions = {
+  /** When set (browser callback), the charge must belong to this user. */
+  expectedUserId?: string;
+};
+
 /**
  * Verify + fulfill a charge. Handles both real Tap charges and the built-in
  * simulated ("mock_") charges. Safe to call from the webhook and the callback.
  */
-export async function fulfillCharge(chargeId: string): Promise<FulfillResult> {
+export async function fulfillCharge(
+  chargeId: string,
+  opts: FulfillOptions = {},
+): Promise<FulfillResult> {
   // Simulated checkout: credits are applied at confirmation time; here we just
   // report the outcome based on the stored intent.
   if (chargeId.startsWith("mock_")) {
+    if (!opts.expectedUserId) {
+      throw new Error("Authentication required");
+    }
     const { data: intent } = await supabaseAdmin
       .from("payment_intents")
-      .select("plan_id,status,amount,currency")
+      .select("user_id,plan_id,status,amount,currency")
       .eq("id", chargeId)
       .maybeSingle();
     const plan = intent ? getPlan(intent.plan_id) : undefined;
-    if (!intent || !plan || intent.status !== "captured") {
-      return { status: "PENDING", fulfilled: false, planId: intent?.plan_id };
+    if (!intent || intent.user_id !== opts.expectedUserId || !plan || intent.status !== "captured") {
+      throw new Error("Charge not found");
     }
     return {
       status: "CAPTURED",
@@ -234,6 +319,10 @@ export async function fulfillCharge(chargeId: string): Promise<FulfillResult> {
   const meta = charge?.metadata ?? {};
   const userId: string | undefined = meta.user_id;
   const planId: string | undefined = meta.plan_id;
+
+  if (opts.expectedUserId && userId !== opts.expectedUserId) {
+    throw new Error("Charge not found");
+  }
 
   if (status !== "CAPTURED" || !userId || !planId) {
     return { status, fulfilled: false, planId };

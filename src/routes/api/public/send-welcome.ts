@@ -8,8 +8,8 @@ export const Route = createFileRoute("/api/public/send-welcome")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = request.headers.get("x-webhook-secret");
-        if (!secret || secret !== process.env.CRON_SECRET) {
+        const { verifyCronSecret } = await import("@/lib/cron-auth.server");
+        if (!verifyCronSecret(request)) {
           return new Response("Unauthorized", { status: 401 });
         }
 
