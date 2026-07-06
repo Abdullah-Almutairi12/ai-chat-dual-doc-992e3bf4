@@ -7,7 +7,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { authCallbackUrl } from "@/lib/app-origin";
 
 function safeRedirect(value: unknown): string {
   if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) return value;
@@ -41,7 +41,7 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: authCallbackUrl(dest),
             data: { name },
           },
         });
@@ -67,17 +67,22 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   const onGoogle = async () => {
     setGoogleLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: authCallbackUrl(dest),
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
       });
-      if (result.error) {
-        toast.error(result.error.message ?? "Google sign-in failed");
-        setGoogleLoading(false);
+      if (error) throw error;
+      if (data.url) {
+        window.location.assign(data.url);
         return;
       }
-      if (result.redirected) return;
-      toast.success(lang === "ar" ? "تم تسجيل الدخول" : "Signed in");
-      navigate({ to: dest });
+      throw new Error("Google sign-in URL was not returned");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
       setGoogleLoading(false);

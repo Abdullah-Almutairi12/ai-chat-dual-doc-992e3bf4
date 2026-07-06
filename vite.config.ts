@@ -14,7 +14,7 @@ export default defineConfig({
   },
   vite: {
     // Expose SUPABASE_* vars to the client bundle on Vercel (not only VITE_*).
-    envPrefix: ["VITE_", "SUPABASE_"],
+    envPrefix: ["VITE_", "SUPABASE_", "APP_"],
     ssr: {
       // Keep browser-only PDF/Office libraries out of the SSR server bundle.
       external: ["pdfjs-dist", "pdf-lib", "docx", "xlsx", "jspdf", "pptxgenjs", "tesseract.js"],
