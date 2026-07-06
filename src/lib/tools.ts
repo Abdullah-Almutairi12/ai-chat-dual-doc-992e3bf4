@@ -2,7 +2,6 @@ import {
   MessageSquareText,
   Sheet,
   SpellCheck,
-  FileType2,
   GraduationCap,
   ChartColumnBig,
   type LucideIcon,
@@ -39,13 +38,6 @@ export const tools: Tool[] = [
     icon: SpellCheck,
     titleKey: "tool_proofreader",
     descKey: "tool_proofreader_desc",
-  },
-  {
-    id: "converter",
-    path: "/converter",
-    icon: FileType2,
-    titleKey: "tool_converter",
-    descKey: "tool_converter_desc",
   },
   {
     id: "quiz",

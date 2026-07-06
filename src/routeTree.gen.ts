@@ -23,7 +23,6 @@ import { Route as AppTablesRouteImport } from './routes/_app.tables'
 import { Route as AppQuizRouteImport } from './routes/_app.quiz'
 import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
-import { Route as AppConverterRouteImport } from './routes/_app.converter'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 import { Route as AppToolsRouteImport } from './routes/_app.tools'
@@ -105,11 +104,6 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
-const AppConverterRoute = AppConverterRouteImport.update({
-  id: '/converter',
-  path: '/converter',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppChatRoute = AppChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -182,7 +176,6 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/analyzer': typeof AppAnalyzerRoute
   '/chat': typeof AppChatRoute
-  '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
@@ -209,7 +202,6 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/analyzer': typeof AppAnalyzerRoute
   '/chat': typeof AppChatRoute
-  '/converter': typeof AppConverterRoute
   '/dashboard': typeof AppDashboardRoute
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
@@ -238,7 +230,6 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/analyzer': typeof AppAnalyzerRoute
   '/_app/chat': typeof AppChatRoute
-  '/_app/converter': typeof AppConverterRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/proofreader': typeof AppProofreaderRoute
   '/_app/quiz': typeof AppQuizRoute
@@ -267,7 +258,6 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/analyzer'
     | '/chat'
-    | '/converter'
     | '/dashboard'
     | '/proofreader'
     | '/quiz'
@@ -294,7 +284,6 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/analyzer'
     | '/chat'
-    | '/converter'
     | '/dashboard'
     | '/proofreader'
     | '/quiz'
@@ -322,7 +311,6 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_app/analyzer'
     | '/_app/chat'
-    | '/_app/converter'
     | '/_app/dashboard'
     | '/_app/proofreader'
     | '/_app/quiz'
@@ -457,13 +445,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/converter': {
-      id: '/_app/converter'
-      path: '/converter'
-      fullPath: '/converter'
-      preLoaderRoute: typeof AppConverterRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/chat': {
       id: '/_app/chat'
       path: '/chat'
@@ -594,7 +575,6 @@ const AppToolsRouteWithChildren = AppToolsRoute._addFileChildren(AppToolsRouteCh
 interface AppRouteChildren {
   AppAnalyzerRoute: typeof AppAnalyzerRoute
   AppChatRoute: typeof AppChatRoute
-  AppConverterRoute: typeof AppConverterRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppProofreaderRoute: typeof AppProofreaderRoute
   AppQuizRoute: typeof AppQuizRoute
@@ -605,7 +585,6 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyzerRoute: AppAnalyzerRoute,
   AppChatRoute: AppChatRoute,
-  AppConverterRoute: AppConverterRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppProofreaderRoute: AppProofreaderRoute,
   AppQuizRoute: AppQuizRoute,

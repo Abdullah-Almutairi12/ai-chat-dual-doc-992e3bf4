@@ -93,7 +93,6 @@ export const aiTools = [
   "chat",
   "tables",
   "proofreader",
-  "converter",
   "quiz",
   "analyzer",
 ] as const;

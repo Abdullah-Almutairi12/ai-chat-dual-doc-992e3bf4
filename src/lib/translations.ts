@@ -36,14 +36,13 @@ const en = {
   hero_cta: "Get Started",
   hero_secondary: "Explore features",
 
-  features_title: "Six powerful tools, one workspace",
+  features_title: "Five powerful tools, one workspace",
   features_subtitle: "Everything you need to work smarter with documents.",
 
   // tool titles
   tool_chat: "Chat & Summary",
   tool_tables: "Table & Excel Extractor",
   tool_proofreader: "Proofreader & Smart Editor",
-  tool_converter: "Smart Document Converter",
   tool_quiz: "AI Quiz Generator",
   tool_analyzer: "Financial & Legal Analyzer",
 
@@ -51,7 +50,6 @@ const en = {
   tool_chat_desc: "Ask questions and get instant answers grounded in your PDF.",
   tool_tables_desc: "Detect tables in any PDF and export them to clean Excel files.",
   tool_proofreader_desc: "Catch grammar and spelling mistakes in Arabic and English.",
-  tool_converter_desc: "Convert PDF to Word or run OCR on scanned documents.",
   tool_quiz_desc: "Turn any document into an interactive quiz with instant scoring.",
   tool_analyzer_desc: "Extract key metrics into charts and flag risky legal clauses.",
 
@@ -302,20 +300,18 @@ const ar: Record<keyof typeof en, string> = {
   hero_cta: "ابدأ الآن",
   hero_secondary: "استكشف الميزات",
 
-  features_title: "ست أدوات قوية في منصة واحدة",
+  features_title: "خمس أدوات قوية في منصة واحدة",
   features_subtitle: "كل ما تحتاجه للعمل بذكاء مع مستنداتك.",
 
   tool_chat: "المحادثة والتلخيص",
   tool_tables: "مستخرج الجداول",
   tool_proofreader: "المصحح والمراجع اللغوي",
-  tool_converter: "محول الصيغ الذكي",
   tool_quiz: "منشئ الاختبارات التلقائي",
   tool_analyzer: "المحلل المالي والقانوني",
 
   tool_chat_desc: "اطرح الأسئلة واحصل على إجابات فورية مستندة إلى ملفك.",
   tool_tables_desc: "اكتشف الجداول في أي ملف PDF وصدّرها إلى ملفات Excel نظيفة.",
   tool_proofreader_desc: "اكتشف الأخطاء النحوية والإملائية بالعربية والإنجليزية.",
-  tool_converter_desc: "حوّل PDF إلى Word أو نفّذ OCR على المستندات الممسوحة.",
   tool_quiz_desc: "حوّل أي مستند إلى اختبار تفاعلي مع تصحيح فوري.",
   tool_analyzer_desc: "استخرج المؤشرات في رسوم بيانية وحدّد البنود القانونية الخطرة.",
 
