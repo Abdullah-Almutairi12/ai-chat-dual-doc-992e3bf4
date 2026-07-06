@@ -1,6 +1,6 @@
 /** Canonical app origin for auth redirects (Vercel / custom domain / local dev). */
 
-import { readServerEnvAlias, SERVER_ENV_ALIASES } from "@/integrations/supabase/env";
+import { readServerEnvAlias, SERVER_ENV_ALIASES } from "@/integrations/supabase/env.server";
 
 export function resolveAppOrigin(): string {
   if (typeof window !== "undefined" && window.location.origin) {

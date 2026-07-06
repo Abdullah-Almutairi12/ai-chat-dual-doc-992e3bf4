@@ -17,8 +17,8 @@ export default defineConfig({
     preset: "vercel",
   },
   vite: {
-    // Public client vars only. Server secrets must use readServerEnv() — never import.meta.env.
-    envPrefix: ["VITE_", "SUPABASE_", "APP_"],
+    // Client-safe prefixes only. Billing secrets live in env.server.ts (never import.meta.env).
+    envPrefix: ["VITE_", "APP_"],
     ssr: {
       // Keep browser-only PDF/Office libraries out of the SSR server bundle.
       external: ["pdfjs-dist", "pdf-lib", "docx", "xlsx", "jspdf", "pptxgenjs", "tesseract.js"],

@@ -6,7 +6,7 @@ import {
   isTapLiveMode as resolveTapLiveMode,
   readServerEnvAlias,
   SERVER_ENV_ALIASES,
-} from "@/integrations/supabase/env";
+} from "@/integrations/supabase/env.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { BILLING_INTERVAL_DAYS, CURRENCY, getPlan, type Plan } from "./packages";
 

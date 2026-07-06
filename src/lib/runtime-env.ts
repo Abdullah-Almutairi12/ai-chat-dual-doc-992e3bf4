@@ -1,70 +1,60 @@
 /**
- * Server env access for Vercel Production, Cloudflare Workers, and local Node.
- * Always use readServerEnv() — never static process.env.KEY (Vite inlines at build).
+ * Per-request env binding (used by src/server.ts).
+ * For billing secrets use @/integrations/supabase/env.server instead.
  */
 
-type EnvBag = Record<string, string | undefined>;
-
-let requestEnvStore: EnvBag | undefined;
-
-function isServerRuntime(): boolean {
-  return typeof window === "undefined";
+declare global {
+  var __PDFQUANTA_REQUEST_ENV__: Record<string, string> | undefined;
 }
 
-function normalizeEnvValue(value: unknown): string | undefined {
+type EnvBag = Record<string, string>;
+
+function normalize(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-/** Called at the start of each server fetch (see src/server.ts). */
-export function bindRequestEnv(env: unknown): void {
+function buildEnvBag(platformEnv: unknown): EnvBag {
   const bag: EnvBag = {};
 
-  // Vercel Production: secrets are on process.env at request time.
   if (typeof process !== "undefined" && process.env) {
     for (const key of Object.keys(process.env)) {
-      const value = normalizeEnvValue(process.env[key]);
+      const value = normalize(process.env[key]);
       if (value) bag[key] = value;
     }
   }
 
-  // Cloudflare / edge bindings override or supplement process.env.
-  if (env && typeof env === "object") {
-    for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
-      const normalized = normalizeEnvValue(value);
+  if (platformEnv && typeof platformEnv === "object") {
+    for (const [key, value] of Object.entries(platformEnv as Record<string, unknown>)) {
+      const normalized = normalize(value);
       if (normalized) bag[key] = normalized;
     }
   }
 
-  requestEnvStore = Object.keys(bag).length > 0 ? bag : undefined;
+  return bag;
+}
+
+/** Called at the start of each server fetch (see src/server.ts). */
+export function bindRequestEnv(env: unknown): void {
+  globalThis.__PDFQUANTA_REQUEST_ENV__ = buildEnvBag(env);
 }
 
 export function clearRequestEnv(): void {
-  requestEnvStore = undefined;
+  globalThis.__PDFQUANTA_REQUEST_ENV__ = undefined;
 }
 
-/** Dynamic lookup — not replaced by Vite at build time. */
+/** Public/non-secret server reads only. Secrets → env.server.ts */
 export function readServerEnv(key: string): string | undefined {
-  // Lazy-init from process.env when no request binding ran yet (server functions).
-  if (!requestEnvStore && typeof process !== "undefined" && process.env) {
-    bindRequestEnv(undefined);
+  if (!globalThis.__PDFQUANTA_REQUEST_ENV__ && typeof process !== "undefined" && process.env) {
+    globalThis.__PDFQUANTA_REQUEST_ENV__ = buildEnvBag(undefined);
   }
 
-  const fromStore = normalizeEnvValue(requestEnvStore?.[key]);
-  if (fromStore) return fromStore;
+  const bag = globalThis.__PDFQUANTA_REQUEST_ENV__;
+  if (bag?.[key]) return bag[key];
 
   if (typeof process !== "undefined" && process.env) {
-    const fromProcess = normalizeEnvValue(process.env[key]);
-    if (fromProcess) return fromProcess;
-  }
-
-  // Vercel build may embed SUPABASE_* / APP_* into the server bundle via envPrefix.
-  if (isServerRuntime() && typeof import.meta !== "undefined") {
-    const fromMeta = normalizeEnvValue(
-      (import.meta.env as Record<string, string | undefined>)[key],
-    );
-    if (fromMeta) return fromMeta;
+    return normalize(process.env[key]);
   }
 
   return undefined;

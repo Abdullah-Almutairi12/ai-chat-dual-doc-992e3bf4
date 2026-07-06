@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-import { readServerEnvAlias, SERVER_ENV_ALIASES } from "@/integrations/supabase/env";
+import { readServerEnvAlias, SERVER_ENV_ALIASES } from "@/integrations/supabase/env.server";
 
 /** Verify server-to-server cron / internal webhook calls (pg_net, pg_cron). */
 export function verifyCronSecret(request: Request): boolean {

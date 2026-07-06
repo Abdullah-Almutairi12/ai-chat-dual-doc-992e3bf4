@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "framework": null,
+  "build": {
+    "env": {
+      "NITRO_PRESET": "vercel"
+    }
+  }
+}
