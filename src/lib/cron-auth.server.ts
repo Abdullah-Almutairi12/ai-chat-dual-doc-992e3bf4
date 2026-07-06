@@ -1,8 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 
+import { readServerEnv } from "@/integrations/supabase/env";
+
 /** Verify server-to-server cron / internal webhook calls (pg_net, pg_cron). */
 export function verifyCronSecret(request: Request): boolean {
-  const expected = process.env.CRON_SECRET?.trim();
+  const expected = readServerEnv("CRON_SECRET");
   if (!expected) {
     console.error("[cron-auth] CRON_SECRET is not configured");
     return false;

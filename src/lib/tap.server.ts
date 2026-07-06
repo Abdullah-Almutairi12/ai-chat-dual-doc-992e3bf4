@@ -2,13 +2,18 @@
 // component; only from server function/route handlers (dynamic import).
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import {
+  isTapLiveMode as resolveTapLiveMode,
+  readServerEnv,
+  resolveTapSecretKey,
+} from "@/integrations/supabase/env";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { BILLING_INTERVAL_DAYS, CURRENCY, getPlan, type Plan } from "./packages";
 
 const TAP_BASE = "https://api.tap.company/v2";
 
 function tapKey(): string {
-  const key = process.env.TAP_SECRET_KEY;
+  const key = resolveTapSecretKey();
   if (!key) throw new Error("TAP_SECRET_KEY is not configured");
   return key;
 }
@@ -19,7 +24,7 @@ function tapKey(): string {
  * would grant credits without a real payment.
  */
 export function isTapLiveMode(): boolean {
-  return (process.env.TAP_SECRET_KEY ?? "").startsWith("sk_live_");
+  return resolveTapLiveMode();
 }
 
 async function tapFetch(path: string, init: RequestInit = {}) {
@@ -42,8 +47,8 @@ async function tapFetch(path: string, init: RequestInit = {}) {
 }
 
 const WEBHOOK_URL =
-  process.env.TAP_WEBHOOK_URL ||
-  `${process.env.APP_ORIGIN ?? "https://pdfquanta.online"}/api/public/tap-webhook`;
+  readServerEnv("TAP_WEBHOOK_URL") ||
+  `${readServerEnv("APP_ORIGIN") ?? "https://pdfquanta.online"}/api/public/tap-webhook`;
 
 /** ISO decimal places for Tap hashstring amount formatting. */
 const TAP_CURRENCY_DECIMALS: Record<string, number> = {

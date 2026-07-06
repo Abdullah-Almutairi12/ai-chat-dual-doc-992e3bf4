@@ -13,7 +13,9 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    // Expose SUPABASE_* vars to the client bundle on Vercel (not only VITE_*).
+    // Public client vars: VITE_* and APP_* are embedded at build time.
+    // SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY are also exposed for Vercel naming.
+    // Server secrets (SERVICE_ROLE, TAP_SECRET_KEY) must use readServerEnv() — never import.meta.env.
     envPrefix: ["VITE_", "SUPABASE_", "APP_"],
     ssr: {
       // Keep browser-only PDF/Office libraries out of the SSR server bundle.

@@ -1,6 +1,7 @@
 // Server-only email delivery via Resend. Never import from a component or route
 // module scope — only from server function / server route handlers (dynamic import).
 import { CURRENCY } from "./packages";
+import { readServerEnv } from "@/integrations/supabase/env";
 
 const RESEND_URL = "https://api.resend.com/emails";
 
@@ -11,7 +12,7 @@ const BRAND = "PDF Quanta";
 const SITE = "https://pdfquanta.online";
 
 function resendKey(): string {
-  const key = process.env.RESEND_API_KEY;
+  const key = readServerEnv("RESEND_API_KEY");
   if (!key) throw new Error("RESEND_API_KEY is not configured");
   return key;
 }

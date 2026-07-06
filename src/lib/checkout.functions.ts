@@ -1,12 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { billingEnvError, missingBillingServerEnv } from "@/integrations/supabase/env";
 import { getPlan } from "./packages";
 
 /** Returns true when a Tap LIVE secret key is configured (sk_live_*). */
 export const isLiveMode = createServerFn({ method: "GET" }).handler(async () => {
   const { isTapLiveMode } = await import("./tap.server");
   return isTapLiveMode();
+});
+
+/** Server-side billing env check (does not expose secret values). */
+export const getBillingHealth = createServerFn({ method: "GET" }).handler(async () => {
+  const missing = missingBillingServerEnv();
+  return {
+    ok: missing.length === 0,
+    missing,
+    message: missing.length ? billingEnvError(missing) : null,
+  };
 });
 
 /** Start a Tap checkout for a paid plan. Returns the hosted-page URL. */
