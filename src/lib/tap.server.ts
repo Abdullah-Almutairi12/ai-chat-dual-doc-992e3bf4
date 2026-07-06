@@ -4,8 +4,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
   isTapLiveMode as resolveTapLiveMode,
-  readServerEnv,
-  resolveTapSecretKey,
+  readServerEnvAlias,
+  SERVER_ENV_ALIASES,
 } from "@/integrations/supabase/env";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { BILLING_INTERVAL_DAYS, CURRENCY, getPlan, type Plan } from "./packages";
@@ -13,7 +13,7 @@ import { BILLING_INTERVAL_DAYS, CURRENCY, getPlan, type Plan } from "./packages"
 const TAP_BASE = "https://api.tap.company/v2";
 
 function tapKey(): string {
-  const key = resolveTapSecretKey();
+  const key = readServerEnvAlias(SERVER_ENV_ALIASES.tapSecret);
   if (!key) throw new Error("TAP_SECRET_KEY is not configured");
   return key;
 }
@@ -46,9 +46,12 @@ async function tapFetch(path: string, init: RequestInit = {}) {
   return body as Record<string, any>;
 }
 
-const WEBHOOK_URL =
-  readServerEnv("TAP_WEBHOOK_URL") ||
-  `${readServerEnv("APP_ORIGIN") ?? "https://pdfquanta.online"}/api/public/tap-webhook`;
+function getTapWebhookUrl(): string {
+  return (
+    readServerEnvAlias(SERVER_ENV_ALIASES.tapWebhookUrl) ||
+    `${readServerEnvAlias(SERVER_ENV_ALIASES.appOrigin) ?? "https://pdfquanta.online"}/api/public/tap-webhook`
+  );
+}
 
 /** ISO decimal places for Tap hashstring amount formatting. */
 const TAP_CURRENCY_DECIMALS: Record<string, number> = {
@@ -145,7 +148,7 @@ export async function createTapCharge(opts: {
       },
       source: { id: "src_all" },
       redirect: { url: `${origin}/payment/callback` },
-      post: { url: WEBHOOK_URL },
+      post: { url: getTapWebhookUrl() },
     }),
   });
   const url = charge?.transaction?.url;
@@ -444,8 +447,8 @@ export async function chargeRenewal(sub: {
       metadata: { user_id: sub.user_id, plan_id: sub.plan_id, kind: "renewal" },
       customer: { id: sub.tap_customer_id },
       source: { id: sub.tap_card_id },
-      redirect: { url: WEBHOOK_URL },
-      post: { url: WEBHOOK_URL },
+      redirect: { url: getTapWebhookUrl() },
+      post: { url: getTapWebhookUrl() },
     }),
   });
   return charge;

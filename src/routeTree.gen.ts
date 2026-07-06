@@ -30,6 +30,7 @@ import { Route as AppToolsRouteImport } from './routes/_app.tools'
 import { Route as AppToolsToolIdRouteImport } from './routes/_app.tools.$toolId'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
+import { Route as ApiPublicBillingHealthRouteImport } from './routes/api/public/billing-health'
 import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
 import { Route as ApiPublicSendWelcomeRouteImport } from './routes/api/public/send-welcome'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
@@ -140,6 +141,11 @@ const ApiPublicTapWebhookRoute = ApiPublicTapWebhookRouteImport.update({
   path: '/api/public/tap-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBillingHealthRoute = ApiPublicBillingHealthRouteImport.update({
+  id: '/api/public/billing-health',
+  path: '/api/public/billing-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTapRenewRoute = ApiPublicTapRenewRouteImport.update({
   id: '/api/public/tap-renew',
   path: '/api/public/tap-renew',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
+    | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
@@ -353,6 +365,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   PaymentCallbackRoute: typeof PaymentCallbackRoute
   PaymentMockRoute: typeof PaymentMockRoute
+  ApiPublicBillingHealthRoute: typeof ApiPublicBillingHealthRoute
   ApiPublicSendWelcomeRoute: typeof ApiPublicSendWelcomeRoute
   ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
   ApiPublicTapWebhookRoute: typeof ApiPublicTapWebhookRoute
@@ -499,6 +512,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/billing-health': {
+      id: '/api/public/billing-health'
+      path: '/api/public/billing-health'
+      fullPath: '/api/public/billing-health'
+      preLoaderRoute: typeof ApiPublicBillingHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/tap-webhook': {
       id: '/api/public/tap-webhook'

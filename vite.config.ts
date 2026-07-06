@@ -12,10 +12,12 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force Vercel serverless (Node) so process.env + platform bindings work for billing secrets.
+  nitro: {
+    preset: "vercel",
+  },
   vite: {
-    // Public client vars: VITE_* and APP_* are embedded at build time.
-    // SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY are also exposed for Vercel naming.
-    // Server secrets (SERVICE_ROLE, TAP_SECRET_KEY) must use readServerEnv() — never import.meta.env.
+    // Public client vars only. Server secrets must use readServerEnv() — never import.meta.env.
     envPrefix: ["VITE_", "SUPABASE_", "APP_"],
     ssr: {
       // Keep browser-only PDF/Office libraries out of the SSR server bundle.

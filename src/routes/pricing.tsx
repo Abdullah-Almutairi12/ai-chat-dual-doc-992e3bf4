@@ -5,13 +5,12 @@ import { ArrowLeft, Check, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Navbar } from "@/components/Navbar";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { CURRENCY, PLANS, type Plan } from "@/lib/packages";
 import { supabase } from "@/integrations/supabase/client";
-import { createCheckout, claimFree, getBillingHealth } from "@/lib/checkout.functions";
+import { createCheckout, claimFree } from "@/lib/checkout.functions";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -40,26 +39,9 @@ function PricingPage() {
   const navigate = useNavigate();
   const checkoutFn = useServerFn(createCheckout);
   const freeFn = useServerFn(claimFree);
-  const billingHealthFn = useServerFn(getBillingHealth);
 
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
-  const [billingWarning, setBillingWarning] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const health = await billingHealthFn();
-        if (active && !health.ok && health.message) setBillingWarning(health.message);
-      } catch {
-        // Ignore — checkout will surface a concrete error if billing is misconfigured.
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [billingHealthFn]);
 
   useEffect(() => {
     let active = true;
@@ -135,11 +117,6 @@ function PricingPage() {
             <p className="mt-3 text-sm font-medium text-primary">
               {ar ? `رصيدك الحالي: ${credits}` : `Your balance: ${credits} credits`}
             </p>
-          )}
-          {billingWarning && (
-            <Alert variant="destructive" className="mt-6 text-start">
-              <AlertDescription>{billingWarning}</AlertDescription>
-            </Alert>
           )}
         </div>
 
