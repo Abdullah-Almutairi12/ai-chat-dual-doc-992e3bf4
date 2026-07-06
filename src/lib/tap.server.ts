@@ -3,8 +3,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
+  hydrateVercelProductionEnv,
   isTapLiveMode as resolveTapLiveMode,
   readServerEnvAlias,
+  resolveTapSecretKey,
   SERVER_ENV_ALIASES,
 } from "@/integrations/supabase/env.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -12,9 +14,17 @@ import { BILLING_INTERVAL_DAYS, CURRENCY, getPlan, type Plan } from "./packages"
 
 const TAP_BASE = "https://api.tap.company/v2";
 
-function tapKey(): string {
-  const key = readServerEnvAlias(SERVER_ENV_ALIASES.tapSecret);
-  if (!key) throw new Error("TAP_SECRET_KEY is not configured");
+/** Hosted checkout source — lets Tap show its payment page (not a card token). */
+const TAP_HOSTED_CHECKOUT_SOURCE = "src_all";
+
+function tapSecretKey(): string {
+  hydrateVercelProductionEnv();
+  const key = resolveTapSecretKey();
+  if (!key) {
+    throw new Error(
+      "TAP_SECRET_KEY is not configured or invalid (must be sk_test_* or sk_live_*)",
+    );
+  }
   return key;
 }
 
@@ -28,20 +38,25 @@ export function isTapLiveMode(): boolean {
 }
 
 async function tapFetch(path: string, init: RequestInit = {}) {
+  const secret = tapSecretKey();
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${secret}`);
+  headers.set("Accept", "application/json");
+  headers.set("Content-Type", "application/json");
+
   const res = await fetch(`${TAP_BASE}${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${tapKey()}`,
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
+    method: init.method ?? "GET",
+    headers,
   });
+
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg =
+    const tapMsg =
       (body && (body.errors?.[0]?.description || body.message)) ||
       `Tap request failed (${res.status})`;
-    throw new Error(msg);
+    console.error("[tapFetch]", path, res.status, tapMsg);
+    throw new Error(tapMsg);
   }
   return body as Record<string, any>;
 }
@@ -51,6 +66,22 @@ function getTapWebhookUrl(): string {
     readServerEnvAlias(SERVER_ENV_ALIASES.tapWebhookUrl) ||
     `${readServerEnvAlias(SERVER_ENV_ALIASES.appOrigin) ?? "https://pdfquanta.online"}/api/public/tap-webhook`
   );
+}
+
+function buildTapCustomer(email: string) {
+  const safeEmail = email?.trim();
+  const firstName = (safeEmail?.split("@")[0] || "Customer").slice(0, 50);
+  const customer: { first_name: string; email?: string } = { first_name: firstName };
+  if (safeEmail && safeEmail.includes("@")) {
+    customer.email = safeEmail;
+  }
+  return customer;
+}
+
+function isValidSavedCardSource(id: string | null | undefined): id is string {
+  if (!id?.trim()) return false;
+  const value = id.trim();
+  return value.startsWith("card_") || value.startsWith("tok_") || value.startsWith("src_");
 }
 
 /** ISO decimal places for Tap hashstring amount formatting. */
@@ -117,7 +148,7 @@ export function verifyTapWebhookHash(
     ? `x_id${id}x_amount${amount}x_currency${currency}x_updated${updated}x_status${status}x_created${created}`
     : `x_id${id}x_amount${amount}x_currency${currency}x_gateway_reference${gatewayReference}x_payment_reference${paymentReference}x_status${status}x_created${created}`;
 
-  const computed = createHmac("sha256", tapKey()).update(toBeHashed).digest("hex");
+  const computed = createHmac("sha256", tapSecretKey()).update(toBeHashed).digest("hex");
   const received = hashHeader.trim().toLowerCase();
   const expected = computed.toLowerCase();
 
@@ -133,24 +164,25 @@ export async function createTapCharge(opts: {
   origin: string;
 }): Promise<{ url: string; chargeId: string }> {
   const { userId, email, plan, origin } = opts;
+
   const charge = await tapFetch("/charges", {
     method: "POST",
     body: JSON.stringify({
       amount: plan.price,
       currency: CURRENCY,
+      customer_initiated: true,
       threeDSecure: true,
+      save_card: false,
       description: `PDF Quanta — ${plan.nameEn} plan`,
       metadata: { user_id: userId, plan_id: plan.id, kind: "subscription" },
       receipt: { email: true, sms: false },
-      customer: {
-        first_name: email ? email.split("@")[0] : "Customer",
-        email: email || undefined,
-      },
-      source: { id: "src_all" },
-      redirect: { url: `${origin}/payment/callback` },
+      customer: buildTapCustomer(email),
+      source: { id: TAP_HOSTED_CHECKOUT_SOURCE },
+      redirect: { url: `${origin.replace(/\/$/, "")}/payment/callback` },
       post: { url: getTapWebhookUrl() },
     }),
   });
+
   const url = charge?.transaction?.url;
   if (!url) throw new Error("Tap did not return a checkout URL");
   return { url, chargeId: charge.id };
@@ -158,7 +190,8 @@ export async function createTapCharge(opts: {
 
 /** Retrieve a charge (source of truth for status). */
 export async function retrieveCharge(chargeId: string) {
-  return tapFetch(`/charges/${chargeId}`, { method: "GET" });
+  if (!chargeId?.trim()) throw new Error("Missing charge id");
+  return tapFetch(`/charges/${encodeURIComponent(chargeId.trim())}`, { method: "GET" });
 }
 
 export type FulfillResult = {
@@ -243,8 +276,6 @@ async function fulfillFromMeta(args: {
 
   await supabaseAdmin.from("profiles").update({ tier: plan.id }).eq("user_id", args.userId);
 
-  // Send the payment invoice/receipt via Resend. Never let email failure break
-  // fulfillment — credits are already applied above.
   try {
     let email = args.email;
     if (!email || !email.includes("@") || email === "unknown@pdfquanta.app") {
@@ -294,8 +325,6 @@ export async function fulfillCharge(
   chargeId: string,
   opts: FulfillOptions = {},
 ): Promise<FulfillResult> {
-  // Simulated checkout: credits are applied at confirmation time; here we just
-  // report the outcome based on the stored intent.
   if (chargeId.startsWith("mock_")) {
     if (!opts.expectedUserId) {
       throw new Error("Authentication required");
@@ -434,19 +463,24 @@ export async function chargeRenewal(sub: {
   tap_customer_id: string | null;
   tap_card_id: string | null;
 }) {
-  if (!sub.tap_customer_id || !sub.tap_card_id) {
-    throw new Error("Missing saved-card details for renewal");
+  if (!sub.tap_customer_id?.trim()) {
+    throw new Error("Missing Tap customer id for renewal");
   }
+  if (!isValidSavedCardSource(sub.tap_card_id)) {
+    throw new Error("Missing or invalid saved card source for renewal");
+  }
+
   const charge = await tapFetch("/charges", {
     method: "POST",
     body: JSON.stringify({
       amount: sub.amount,
       currency: CURRENCY,
+      customer_initiated: false,
       threeDSecure: false,
       description: `PDF Quanta — ${sub.plan_id} plan renewal`,
       metadata: { user_id: sub.user_id, plan_id: sub.plan_id, kind: "renewal" },
-      customer: { id: sub.tap_customer_id },
-      source: { id: sub.tap_card_id },
+      customer: { id: sub.tap_customer_id.trim() },
+      source: { id: sub.tap_card_id!.trim() },
       redirect: { url: getTapWebhookUrl() },
       post: { url: getTapWebhookUrl() },
     }),

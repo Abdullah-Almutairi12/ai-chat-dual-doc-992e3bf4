@@ -19,8 +19,12 @@ export const createCheckout = createServerFn({ method: "POST" })
     const origin = data.origin?.startsWith("http") ? data.origin : "";
     if (!origin) throw new Error("Invalid origin");
 
+    const { hydrateVercelProductionEnv } = await import("@/integrations/supabase/env.server");
     const { createTapCharge, createMockCharge, isTapLiveMode } = await import("./tap.server");
     const email = (context.claims as { email?: string })?.email ?? "";
+
+    hydrateVercelProductionEnv();
+
     try {
       const { url } = await createTapCharge({ userId: context.userId, email, plan, origin });
       return { url, simulated: false };
@@ -29,7 +33,8 @@ export const createCheckout = createServerFn({ method: "POST" })
       // grant credits without a real payment. Surface the error instead.
       if (isTapLiveMode()) {
         console.error("[createCheckout] Tap live charge failed:", err);
-        throw new Error("Payment could not be started. Please try again.");
+        const message = err instanceof Error ? err.message : "Payment could not be started";
+        throw new Error(message.includes("Unauthorized") ? "Tap payment auth failed — check TAP_SECRET_KEY in Vercel" : message);
       }
       // Test mode only: fall back to the built-in simulated checkout so the
       // flow still works with placeholder/sandbox keys.

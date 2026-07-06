@@ -16,12 +16,26 @@ const SERVICE_ROLE_KEYS = [
   "SUPABASE_SERVICE_KEY",
 ] as const;
 
-const TAP_SECRET_KEYS = ["TAP_SECRET_KEY", "TAP_API_KEY", "TAP_SECRET"] as const;
+const TAP_SECRET_KEYS = ["TAP_SECRET_KEY"] as const;
 
 function normalize(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/** Strip quotes, Bearer prefix, and newlines accidentally pasted into Vercel env. */
+export function sanitizeTapSecretKey(raw: string): string {
+  let key = raw.trim().replace(/^['"]|['"]$/g, "");
+  if (key.toLowerCase().startsWith("bearer ")) {
+    key = key.slice(7).trim();
+  }
+  key = key.replace(/[\r\n]+/g, "");
+  return key;
+}
+
+export function isValidTapSecretKey(key: string): boolean {
+  return /^sk_(test|live)_[A-Za-z0-9]+$/.test(key);
 }
 
 /**
@@ -99,7 +113,10 @@ export function resolveSupabaseServiceRoleKey(): string | undefined {
 }
 
 export function resolveTapSecretKey(): string | undefined {
-  return firstKey(TAP_SECRET_KEYS);
+  const raw = firstKey(TAP_SECRET_KEYS);
+  if (!raw) return undefined;
+  const key = sanitizeTapSecretKey(raw);
+  return isValidTapSecretKey(key) ? key : undefined;
 }
 
 export function isTapLiveMode(): boolean {

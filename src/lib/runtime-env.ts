@@ -74,7 +74,7 @@ export const SERVER_ENV_ALIASES = {
     "SUPABASE_SECRET_KEY",
     "SUPABASE_SERVICE_KEY",
   ],
-  tapSecret: ["TAP_SECRET_KEY", "TAP_API_KEY", "TAP_SECRET"],
+  tapSecret: ["TAP_SECRET_KEY"],
   cronSecret: ["CRON_SECRET"],
   resendApiKey: ["RESEND_API_KEY"],
   appOrigin: ["APP_ORIGIN", "VERCEL_URL", "VITE_APP_ORIGIN"],
