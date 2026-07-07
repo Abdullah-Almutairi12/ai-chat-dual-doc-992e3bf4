@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /** Number of PDFs a brand-new user may process completely for free. */
 export const FREE_FILE_LIMIT = 1;
@@ -70,6 +69,7 @@ export const consumeFile = createServerFn({ method: "POST" })
 
     let allowed = subscribed;
     if (!subscribed) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: ok, error } = await supabaseAdmin.rpc("consume_free_file", {
         _user_id: userId,
         _limit: FREE_FILE_LIMIT,

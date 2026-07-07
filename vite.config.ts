@@ -23,5 +23,11 @@ export default defineConfig({
       // Keep browser-only PDF/Office libraries out of the SSR server bundle.
       external: ["pdfjs-dist", "pdf-lib", "docx", "xlsx", "jspdf", "pptxgenjs", "tesseract.js"],
     },
+    optimizeDeps: {
+      include: ["pdfjs-dist", "pdf-lib"],
+    },
+    worker: {
+      format: "es",
+    },
   },
 });

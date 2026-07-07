@@ -1,27 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
-import { PdfToolsHub } from "@/components/pdf/PdfToolsHub";
-import { useI18n } from "@/lib/i18n";
-import { pageHead } from "@/lib/seo";
-
+/**
+ * Layout for /tools/* — child routes (e.g. /tools/watermark-add) render in <Outlet />.
+ * The hub grid lives at /tools exactly (see _app.tools.index.tsx).
+ */
 export const Route = createFileRoute("/_app/tools")({
   ssr: false,
-  head: () =>
-    pageHead({
-      path: "/tools",
-      title: "Integrated PDF Tools — PDF Quanta",
-      description:
-        "Professional PDF toolkit: convert, merge, split, watermark, compress, edit, sign, and protect PDFs with Arabic layout preservation.",
-    }),
-  component: ToolsPage,
+  component: ToolsLayout,
 });
 
-function ToolsPage() {
-  const { t } = useI18n();
-  return (
-    <>
-      <title>{t("pdf_suite_title")}</title>
-      <PdfToolsHub />
-    </>
-  );
+function ToolsLayout() {
+  return <Outlet />;
 }

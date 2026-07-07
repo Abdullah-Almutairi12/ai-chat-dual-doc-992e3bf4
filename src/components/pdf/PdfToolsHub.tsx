@@ -2,11 +2,36 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 import { useI18n } from "@/lib/i18n";
-import { PDF_TOOL_CATEGORIES, pdfTools, toolsByCategory } from "@/lib/pdf-tools";
+import { PDF_TOOL_CATEGORIES, pdfTools, toolsByCategory, type PdfTool } from "@/lib/pdf-tools";
 
-export function PdfToolsHub() {
+function ToolCard({ tool, index }: { tool: PdfTool; index: number }) {
   const { t, dir } = useI18n();
   const arrow = dir === "rtl" ? "rotate-180" : "";
+
+  return (
+    <Link
+      to="/tools/$toolId"
+      params={{ toolId: tool.id }}
+      preload="intent"
+      className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-elegant animate-fade-up cursor-pointer"
+      style={{ animationDelay: `${index * 40}ms` }}
+      aria-label={`${t(tool.titleKey)} — ${t("open_tool")}`}
+    >
+      <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-primary transition-colors group-hover:gradient-hero group-hover:text-primary-foreground">
+        <tool.icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <h3 className="mt-3 text-sm font-semibold text-foreground">{t(tool.titleKey)}</h3>
+      <p className="mt-1.5 flex-1 text-xs leading-relaxed text-muted-foreground">{t(tool.descKey)}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
+        {t("open_tool")}
+        <ArrowRight className={`h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 ${arrow}`} />
+      </span>
+    </Link>
+  );
+}
+
+export function PdfToolsHub() {
+  const { t } = useI18n();
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -43,23 +68,7 @@ export function PdfToolsHub() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {items.map((tool, i) => (
-                  <Link
-                    key={tool.id}
-                    to="/tools/$toolId"
-                    params={{ toolId: tool.id }}
-                    className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-elegant animate-fade-up"
-                    style={{ animationDelay: `${i * 40}ms` }}
-                  >
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-primary transition-colors group-hover:gradient-hero group-hover:text-primary-foreground">
-                      <tool.icon className="h-5 w-5" />
-                    </span>
-                    <h3 className="mt-3 text-sm font-semibold text-foreground">{t(tool.titleKey)}</h3>
-                    <p className="mt-1.5 flex-1 text-xs leading-relaxed text-muted-foreground">{t(tool.descKey)}</p>
-                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
-                      {t("open_tool")}
-                      <ArrowRight className={`h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 ${arrow}`} />
-                    </span>
-                  </Link>
+                  <ToolCard key={tool.id} tool={tool} index={i} />
                 ))}
               </div>
             </section>
@@ -85,10 +94,12 @@ export function PdfToolsPreviewGrid({ limit = 8 }: { limit?: number }) {
           key={tool.id}
           to="/tools/$toolId"
           params={{ toolId: tool.id }}
-          className="group rounded-2xl border border-border bg-card p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant"
+          preload="intent"
+          className="group rounded-2xl border border-border bg-card p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant cursor-pointer"
+          aria-label={`${t(tool.titleKey)} — ${t("open_tool")}`}
         >
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary group-hover:gradient-hero group-hover:text-primary-foreground">
-            <tool.icon className="h-5 w-5" />
+            <tool.icon className="h-5 w-5" aria-hidden="true" />
           </span>
           <h3 className="mt-3 text-sm font-semibold">{t(tool.titleKey)}</h3>
           <span className="mt-2 inline-flex items-center gap-1 text-xs text-primary">

@@ -53,11 +53,8 @@ function isRtlText(s: string): boolean {
 }
 
 async function loadPdfjs() {
-  const pdfjs = await import("pdfjs-dist");
-  // Vite resolves this to a hashed URL for the worker bundle.
-  const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-  return pdfjs;
+  const { loadPdfjsWithWorker } = await import("@/lib/pdf/pdfjs-worker");
+  return loadPdfjsWithWorker();
 }
 
 /** Reusable Tesseract worker so we only load the Arabic model once per doc. */

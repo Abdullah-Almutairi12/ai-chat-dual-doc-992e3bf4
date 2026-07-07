@@ -10,7 +10,6 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { getEntitlement, consumeFile } from "@/lib/entitlement.functions";
-
 export type Entitlement = {
   filesProcessed: number;
   freeLimit: number;
@@ -62,8 +61,14 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mounted.current = true;
     void refresh();
+
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      void refresh();
+    });
+
     return () => {
       mounted.current = false;
+      data.subscription.unsubscribe();
     };
   }, [refresh]);
 
@@ -74,7 +79,8 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         if (mounted.current) setEntitlement(ent);
         if (!ent.allowed && mounted.current) setUpgradeOpen(true);
         return ent.allowed;
-      } catch {
+      } catch (err) {
+        console.error("[entitlement] consume failed", err);
         // On unexpected error, fail closed — do not grant free processing.
         if (mounted.current) setUpgradeOpen(true);
         return false;

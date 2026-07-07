@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Download, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -8,23 +8,29 @@ import { WorkflowLoader } from "@/components/pdf/WorkflowLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
+import { STORAGE_BUCKETS } from "@/integrations/supabase/storage-buckets";
 import { useI18n } from "@/lib/i18n";
 import { getPdfTool, type PdfTool } from "@/lib/pdf-tools";
 import { sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/security";
 import { useEntitlement } from "@/lib/entitlement";
 import { addDocument } from "@/lib/documents";
+import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@/lib/storage.client";
 
 type Props = { toolId: string };
 
 export function PdfToolWorkspace({ toolId }: Props) {
   const tool = getPdfTool(toolId);
   const { t, dir } = useI18n();
-  const { tryConsume, openUpgrade, entitlement } = useEntitlement();
+  const navigate = useNavigate();
+  const { user, isReady: authReady } = useAuth();
+  const { tryConsume, openUpgrade, entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ label: "", percent: 0, stage: "" });
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultName, setResultName] = useState("output.pdf");
+  const runLockRef = useRef(false);
 
   // Tool-specific options
   const [wmText, setWmText] = useState("CONFIDENTIAL");
@@ -43,6 +49,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
   const [drawing, setDrawing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const runRef = useRef<(batch?: File[]) => Promise<void>>(async () => {});
 
   if (!tool) {
     return (
@@ -74,120 +81,186 @@ export function PdfToolWorkspace({ toolId }: Props) {
     }
     setFiles(picked);
     setResultBlob(null);
+    toast.success(t("uploaded"));
+
+    const readyForAutoRun = !tool.multiFile || picked.length >= 2;
+    if (readyForAutoRun && authReady) {
+      toast.info(t("pdf_file_ready"));
+      queueMicrotask(() => void runRef.current(picked));
+    }
   };
 
-  const consumeSlot = async () => {
+  const consumeSlot = async (batch: File[]) => {
+    if (!user) {
+      toast.error(t("pdf_need_login"));
+      navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
+      return false;
+    }
     if (entitlement && !entitlement.allowed) {
       openUpgrade();
       return false;
     }
-    const ok = await tryConsume({ fileName: files[0]?.name, fileSize: files[0]?.size, tool: toolId });
+
+    const meta = {
+      fileName: batch[0]?.name,
+      fileSize: batch[0]?.size,
+      tool: toolId,
+    };
+
+    const viaApi = await consumeProcessingSlot(meta);
+    if (viaApi) {
+      if (!viaApi.allowed) {
+        toast.error(t("free_limit_reached"));
+        openUpgrade();
+        return false;
+      }
+      await refreshEntitlement();
+      if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
+      return true;
+    }
+
+    const ok = await tryConsume(meta);
     if (!ok) {
       toast.error(t("free_limit_reached"));
       return false;
     }
-    if (files[0]) addDocument(files[0].name, Math.round(files[0].size / 1024), toolId);
+    if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
     return true;
   };
 
-  const run = useCallback(async () => {
-    if (!files.length) {
-      toast.error(t("invalid_file"));
-      return;
+  const persistUploads = async (batch: File[], output?: { blob: Blob; name: string }) => {
+    if (!user) return;
+    for (const f of batch) {
+      await uploadFileViaApi(f, { bucket: STORAGE_BUCKETS.pdfTools, toolId });
     }
-    if (!(await consumeSlot())) return;
+    if (output) {
+      await persistProcessedFile(user.id, output.blob, {
+        bucket: STORAGE_BUCKETS.documents,
+        toolId,
+        fileName: output.name,
+      });
+    }
+  };
 
-    setProcessing(true);
-    setProgress({ label: t("pdf_processing"), percent: 5, stage: "" });
-    setResultBlob(null);
+  const run = useCallback(
+    async (batchOverride?: File[]) => {
+      const batch = batchOverride ?? files;
+      if (!batch.length) {
+        toast.error(t("invalid_file"));
+        return;
+      }
+      if (runLockRef.current) return;
+      runLockRef.current = true;
 
-    try {
-      const base = sanitizeFileName(files[0].name.replace(/\.\w+$/i, ""));
-      const pdf = await import("@/lib/pdf/client-api");
-
-      if (tool.convertMode) {
-        const result = await pdf.runConversion(
-          tool.convertMode,
-          files[0],
-          { imageFiles: files },
-          (p) => setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
-        );
-        if (result.blob) {
-          setResultBlob(result.blob);
-          setResultName(`${base}.${result.ext}`);
-        } else if (result.blobs) {
-          for (const b of result.blobs) pdf.downloadBlob(b.blob, b.name);
-          toast.success(t("convert_done"));
-        }
-        setProcessing(false);
+      if (!user) {
+        toast.error(t("pdf_need_login"));
+        navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
+        runLockRef.current = false;
         return;
       }
 
-      let blob: Blob;
-      switch (tool.id) {
+      if (!(await consumeSlot(batch))) {
+        runLockRef.current = false;
+        return;
+      }
+
+      setProcessing(true);
+      setProgress({ label: t("pdf_processing"), percent: 5, stage: "" });
+      setResultBlob(null);
+
+      try {
+        const base = sanitizeFileName(batch[0].name.replace(/\.\w+$/i, ""));
+        const pdf = await import("@/lib/pdf/client-api");
+
+        if (tool!.convertMode) {
+          const result = await pdf.runConversion(
+            tool!.convertMode,
+            batch[0],
+            { imageFiles: batch },
+            (p) => setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
+          );
+          if (result.blob) {
+            setResultBlob(result.blob);
+            setResultName(`${base}.${result.ext}`);
+            await persistUploads(batch, { blob: result.blob, name: `${base}.${result.ext}` });
+          } else if (result.blobs) {
+            for (const b of result.blobs) pdf.downloadBlob(b.blob, b.name);
+            await persistUploads(batch);
+            toast.success(t("convert_done"));
+          }
+          setProcessing(false);
+          runLockRef.current = false;
+          return;
+        }
+
+        let blob: Blob;
+        let outName = `${base}.pdf`;
+        switch (tool!.id) {
         case "merge":
-          blob = await pdf.mergePdfs(files);
-          setResultName(`${base}-merged.pdf`);
+          blob = await pdf.mergePdfs(batch);
+          outName = `${base}-merged.pdf`;
           break;
         case "split": {
-          const parts = await pdf.splitEveryPage(files[0]);
+          const parts = await pdf.splitEveryPage(batch[0]);
           for (const [i, b] of parts.entries()) {
             pdf.downloadBlob(b, `${base}-part-${i + 1}.pdf`);
           }
+          await persistUploads(batch);
           toast.success(t("convert_done"));
           setProcessing(false);
+          runLockRef.current = false;
           return;
         }
         case "rotate":
-          blob = await pdf.rotatePages(files[0], [], rotateAngle);
-          setResultName(`${base}-rotated.pdf`);
+          blob = await pdf.rotatePages(batch[0], [], rotateAngle);
+          outName = `${base}-rotated.pdf`;
           break;
         case "delete-pages": {
           const nums = deletePageStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
-          blob = await pdf.deletePages(files[0], nums);
-          setResultName(`${base}-edited.pdf`);
+          blob = await pdf.deletePages(batch[0], nums);
+          outName = `${base}-edited.pdf`;
           break;
         }
         case "watermark-add":
-          blob = await pdf.addWatermark(files[0], { text: wmText, opacity: wmOpacity, rotation: wmRotation });
-          setResultName(`${base}-watermarked.pdf`);
+          blob = await pdf.addWatermark(batch[0], { text: wmText, opacity: wmOpacity, rotation: wmRotation });
+          outName = `${base}-watermarked.pdf`;
           break;
         case "watermark-remove":
-          blob = await pdf.removeWatermark(files[0], (p) =>
+          blob = await pdf.removeWatermark(batch[0], (p) =>
             setProgress({ label: t("pdf_wm_scanning"), percent: p, stage: "" }),
           );
-          setResultName(`${base}-clean.pdf`);
+          outName = `${base}-clean.pdf`;
           break;
         case "compress":
-          blob = await pdf.optimizePdf(files[0], compressLevel);
-          setResultName(`${base}-optimized.pdf`);
+          blob = await pdf.optimizePdf(batch[0], compressLevel);
+          outName = `${base}-optimized.pdf`;
           break;
         case "add-text":
-          blob = await pdf.addTextToPdf(files[0], [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }]);
-          setResultName(`${base}-edited.pdf`);
+          blob = await pdf.addTextToPdf(batch[0], [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }]);
+          outName = `${base}-edited.pdf`;
           break;
         case "redact":
-          blob = await pdf.redactRegions(files[0], [
+          blob = await pdf.redactRegions(batch[0], [
             { page: redactPage, x: 72, y: 700, width: 200, height: 20 },
           ]);
-          setResultName(`${base}-redacted.pdf`);
+          outName = `${base}-redacted.pdf`;
           break;
         case "reorder": {
           const order = reorderStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
-          blob = await pdf.reorderPages(files[0], order.length ? order : [1]);
-          setResultName(`${base}-reordered.pdf`);
+          blob = await pdf.reorderPages(batch[0], order.length ? order : [1]);
+          outName = `${base}-reordered.pdf`;
           break;
         }
         case "annotate":
-          blob = await pdf.applyAnnotations(files[0], [
+          blob = await pdf.applyAnnotations(batch[0], [
             { type: "highlight", page: 1, x: 72, y: 700, width: 200, height: 16 },
           ]);
-          setResultName(`${base}-annotated.pdf`);
+          outName = `${base}-annotated.pdf`;
           break;
         case "stamp": {
           const bytes = pdf.typedSignatureToBytes("STAMP");
-          blob = await pdf.applySignatures(files[0], [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }]);
-          setResultName(`${base}-stamped.pdf`);
+          blob = await pdf.applySignatures(batch[0], [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }]);
+          outName = `${base}-stamped.pdf`;
           break;
         }
         case "sign": {
@@ -196,33 +269,64 @@ export function PdfToolWorkspace({ toolId }: Props) {
             : sigCanvasRef.current
               ? await pdf.drawSignatureToBytes(sigCanvasRef.current)
               : pdf.typedSignatureToBytes("Signed");
-          blob = await pdf.applySignatures(files[0], [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }]);
-          setResultName(`${base}-signed.pdf`);
+          blob = await pdf.applySignatures(batch[0], [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }]);
+          outName = `${base}-signed.pdf`;
           break;
         }
         case "protect":
-          blob = await pdf.protectPdf(files[0], { userPassword: protectPass, allowPrinting: false, allowCopying: false });
-          setResultName(`${base}-protected.pdf`);
+          blob = await pdf.protectPdf(batch[0], { userPassword: protectPass, allowPrinting: false, allowCopying: false });
+          outName = `${base}-protected.pdf`;
           break;
         case "unlock":
-          blob = await pdf.removeProtection(files[0], unlockPass);
-          setResultName(`${base}-unlocked.pdf`);
+          blob = await pdf.removeProtection(batch[0], unlockPass);
+          outName = `${base}-unlocked.pdf`;
           break;
         default:
           toast.error(t("pdf_tool_not_found"));
           setProcessing(false);
+          runLockRef.current = false;
           return;
       }
 
       setResultBlob(blob);
+      setResultName(outName);
+      await persistUploads(batch, { blob, name: outName });
       toast.success(t("convert_done"));
     } catch (err) {
       console.error("[PdfToolWorkspace]", err);
-      toast.error(t("extract_failed"));
+      const message = err instanceof Error ? err.message : t("extract_failed");
+      toast.error(message || t("extract_failed"));
     } finally {
       setProcessing(false);
+      runLockRef.current = false;
     }
-  }, [files, tool, t, wmText, wmOpacity, wmRotation, rotateAngle, deletePageStr, protectPass, unlockPass, compressLevel, addTextContent, redactPage, reorderStr, signText]);
+  },
+    [
+      files,
+      tool,
+      toolId,
+      t,
+      user,
+      navigate,
+      entitlement,
+      tryConsume,
+      openUpgrade,
+      refreshEntitlement,
+      wmText,
+      wmOpacity,
+      wmRotation,
+      rotateAngle,
+      deletePageStr,
+      protectPass,
+      unlockPass,
+      compressLevel,
+      addTextContent,
+      redactPage,
+      reorderStr,
+      signText,
+    ],
+  );
+  runRef.current = run;
 
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
     setDrawing(true);
@@ -323,7 +427,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
       />
 
       <div className="mt-6 flex justify-end">
-        <Button onClick={() => void run()} disabled={!files.length || processing} className="gap-2">
+        <Button onClick={() => void run()} disabled={!files.length || processing || !authReady} className="gap-2">
           <Play className="h-4 w-4" />
           {t("pdf_run_tool")}
         </Button>

@@ -8,10 +8,8 @@ export type PdfjsDocument = PDFDocumentProxy;
 
 export async function loadPdfjs() {
   requireBrowser();
-  const pdfjs = await import("pdfjs-dist");
-  const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-  return pdfjs;
+  const { loadPdfjsWithWorker } = await import("./pdfjs-worker");
+  return loadPdfjsWithWorker();
 }
 
 export async function readPdfBytes(file: File | Blob): Promise<Uint8Array> {

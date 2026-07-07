@@ -28,6 +28,7 @@ import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
 import { Route as AppToolsRouteImport } from './routes/_app.tools'
 import { Route as AppToolsToolIdRouteImport } from './routes/_app.tools.$toolId'
+import { Route as AppToolsIndexRouteImport } from './routes/_app.tools.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
 import { Route as ApiPublicBillingHealthRouteImport } from './routes/api/public/billing-health'
@@ -126,6 +127,11 @@ const AppToolsRoute = AppToolsRouteImport.update({
   path: '/tools',
   getParentRoute: () => AppRoute,
 } as any)
+const AppToolsIndexRoute = AppToolsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppToolsRoute,
+} as any)
 const AppToolsToolIdRoute = AppToolsToolIdRouteImport.update({
   id: '/$toolId',
   path: '/$toolId',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
   '/tools': typeof AppToolsRouteWithChildren
+  '/tools/': typeof AppToolsIndexRoute
   '/tools/$toolId': typeof AppToolsToolIdRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/payment/callback': typeof PaymentCallbackRoute
@@ -221,7 +228,8 @@ export interface FileRoutesByTo {
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
-  '/tools': typeof AppToolsRouteWithChildren
+  '/tools': typeof AppToolsIndexRoute
+  '/tools/': typeof AppToolsIndexRoute
   '/tools/$toolId': typeof AppToolsToolIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/_app/quiz': typeof AppQuizRoute
   '/_app/tables': typeof AppTablesRoute
   '/_app/tools': typeof AppToolsRouteWithChildren
+  '/_app/tools/': typeof AppToolsIndexRoute
   '/_app/tools/$toolId': typeof AppToolsToolIdRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/payment/callback': typeof PaymentCallbackRoute
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/tables'
     | '/tools'
+    | '/tools/'
     | '/tools/$toolId'
     | '/admin'
     | '/payment/callback'
@@ -310,6 +320,7 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/tables'
     | '/tools'
+    | '/tools/'
     | '/tools/$toolId'
     | '/payment/callback'
     | '/payment/mock'
@@ -506,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppToolsToolIdRouteImport
       parentRoute: typeof AppToolsRoute
     }
+    '/_app/tools/': {
+      id: '/_app/tools/'
+      path: '/'
+      fullPath: '/tools/'
+      preLoaderRoute: typeof AppToolsIndexRouteImport
+      parentRoute: typeof AppToolsRoute
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
@@ -603,10 +621,12 @@ const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface AppToolsRouteChildren {
+  AppToolsIndexRoute: typeof AppToolsIndexRoute
   AppToolsToolIdRoute: typeof AppToolsToolIdRoute
 }
 
 const AppToolsRouteChildren: AppToolsRouteChildren = {
+  AppToolsIndexRoute: AppToolsIndexRoute,
   AppToolsToolIdRoute: AppToolsToolIdRoute,
 }
 
