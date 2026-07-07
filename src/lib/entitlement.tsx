@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { getEntitlement, consumeFile } from "@/lib/entitlement.functions";
+import { getEntitlement, consumeFile, FREE_FILE_LIMIT } from "@/lib/entitlement.functions";
 export type Entitlement = {
   filesProcessed: number;
   freeLimit: number;
@@ -19,6 +19,14 @@ export type Entitlement = {
 };
 
 type FileMeta = { fileName?: string; fileSize?: number; tool?: string };
+
+const defaultFreeEntitlement = (): Entitlement => ({
+  filesProcessed: 0,
+  freeLimit: FREE_FILE_LIMIT,
+  subscribed: false,
+  remaining: FREE_FILE_LIMIT,
+  allowed: true,
+});
 
 type Ctx = {
   entitlement: Entitlement | null;
@@ -52,7 +60,8 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
       const ent = await getEntitlement();
       if (mounted.current) setEntitlement(ent);
     } catch {
-      /* ignore — leave previous state */
+      // Do not block uploads when entitlement lookup fails — assume free trial is available.
+      if (mounted.current) setEntitlement(defaultFreeEntitlement());
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -81,8 +90,13 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         return ent.allowed;
       } catch (err) {
         console.error("[entitlement] consume failed", err);
-        // On unexpected error, fail closed — do not grant free processing.
-        if (mounted.current) setUpgradeOpen(true);
+        try {
+          const ent = await getEntitlement();
+          if (mounted.current) setEntitlement(ent);
+          if (!ent.allowed && mounted.current) setUpgradeOpen(true);
+        } catch {
+          if (mounted.current) setEntitlement(defaultFreeEntitlement());
+        }
         return false;
       }
     },

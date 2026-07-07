@@ -6,6 +6,7 @@ import {
   unauthorizedResponse,
 } from "@/lib/api-auth.server";
 import { FREE_FILE_LIMIT } from "@/lib/entitlement.functions";
+import { ensureUserProfile, readFilesProcessed } from "@/lib/entitlement.server";
 
 async function hasActiveSubscription(
   supabase: ReturnType<typeof import("@supabase/supabase-js").createClient>,
@@ -41,11 +42,13 @@ export const Route = createFileRoute("/api/pdf/consume")({
           const fileSize = Number.isFinite(body.fileSize) ? Math.max(0, Math.floor(body.fileSize!)) : 0;
           const tool = (body.tool ?? "pdf-tool").slice(0, 40);
 
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await ensureUserProfile(supabaseAdmin, userId, { email });
+
           const subscribed = await hasActiveSubscription(supabase, userId);
           let allowed = subscribed;
 
           if (!subscribed) {
-            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
             const { data: ok, error } = await supabaseAdmin.rpc("consume_free_file", {
               _user_id: userId,
               _limit: FREE_FILE_LIMIT,
@@ -66,13 +69,7 @@ export const Route = createFileRoute("/api/pdf/consume")({
             });
           }
 
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("files_processed")
-            .eq("user_id", userId)
-            .maybeSingle();
-
-          const filesProcessed = profile?.files_processed ?? 0;
+          const filesProcessed = await readFilesProcessed(supabase, userId);
           const remaining = subscribed ? null : Math.max(0, FREE_FILE_LIMIT - filesProcessed);
 
           return jsonResponse({

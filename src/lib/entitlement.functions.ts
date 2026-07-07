@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { ensureUserProfile, readFilesProcessed } from "@/lib/entitlement.server";
 
 /** Number of PDFs a brand-new user may process completely for free. */
 export const FREE_FILE_LIMIT = 1;
@@ -33,16 +34,17 @@ async function hasActiveSubscription(
 export const getEntitlement = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<Entitlement> => {
-    const { supabase, userId } = context;
+    const { supabase, userId, claims } = context;
+    const email = (claims as { email?: string })?.email ?? "";
+    const name =
+      (claims as { user_metadata?: { name?: string; full_name?: string } })?.user_metadata?.name ??
+      (claims as { user_metadata?: { name?: string; full_name?: string } })?.user_metadata?.full_name;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureUserProfile(supabaseAdmin, userId, { email, name });
+
     const subscribed = await hasActiveSubscription(supabase, userId);
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("files_processed")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const filesProcessed = profile?.files_processed ?? 0;
+    const filesProcessed = await readFilesProcessed(supabase, userId);
     const remaining = subscribed ? null : Math.max(0, FREE_FILE_LIMIT - filesProcessed);
     const allowed = subscribed || filesProcessed < FREE_FILE_LIMIT;
 
@@ -65,11 +67,17 @@ export const consumeFile = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<Entitlement> => {
     const { supabase, userId } = context;
     const email = (context.claims as { email?: string })?.email ?? "";
+    const name =
+      (context.claims as { user_metadata?: { name?: string; full_name?: string } })?.user_metadata?.name ??
+      (context.claims as { user_metadata?: { name?: string; full_name?: string } })?.user_metadata?.full_name;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureUserProfile(supabaseAdmin, userId, { email, name });
+
     const subscribed = await hasActiveSubscription(supabase, userId);
 
     let allowed = subscribed;
     if (!subscribed) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: ok, error } = await supabaseAdmin.rpc("consume_free_file", {
         _user_id: userId,
         _limit: FREE_FILE_LIMIT,
@@ -89,13 +97,7 @@ export const consumeFile = createServerFn({ method: "POST" })
       });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("files_processed")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const filesProcessed = profile?.files_processed ?? 0;
+    const filesProcessed = await readFilesProcessed(supabase, userId);
     const remaining = subscribed ? null : Math.max(0, FREE_FILE_LIMIT - filesProcessed);
 
     return { filesProcessed, freeLimit: FREE_FILE_LIMIT, subscribed, remaining, allowed };

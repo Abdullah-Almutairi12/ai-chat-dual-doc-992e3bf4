@@ -24,7 +24,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
   const { t, dir } = useI18n();
   const navigate = useNavigate();
   const { user, isReady: authReady } = useAuth();
-  const { tryConsume, openUpgrade, entitlement, refresh: refreshEntitlement } = useEntitlement();
+  const { tryConsume, openUpgrade, entitlement, loading, refresh: refreshEntitlement } = useEntitlement();
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ label: "", percent: 0, stage: "" });
@@ -96,7 +96,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
       navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
       return false;
     }
-    if (entitlement && !entitlement.allowed) {
+    if (!loading && entitlement && !entitlement.allowed) {
       openUpgrade();
       return false;
     }
@@ -110,7 +110,6 @@ export function PdfToolWorkspace({ toolId }: Props) {
     const viaApi = await consumeProcessingSlot(meta);
     if (viaApi) {
       if (!viaApi.allowed) {
-        toast.error(t("free_limit_reached"));
         openUpgrade();
         return false;
       }
@@ -120,10 +119,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
     }
 
     const ok = await tryConsume(meta);
-    if (!ok) {
-      toast.error(t("free_limit_reached"));
-      return false;
-    }
+    if (!ok) return false;
     if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
     return true;
   };
@@ -309,6 +305,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
       user,
       navigate,
       entitlement,
+      loading,
       tryConsume,
       openUpgrade,
       refreshEntitlement,

@@ -28,7 +28,7 @@ export function FileDropzone({
 }: Props) {
   const { t } = useI18n();
   const { setDoc } = useActiveDocument();
-  const { entitlement, tryConsume, openUpgrade } = useEntitlement();
+  const { entitlement, loading, tryConsume, openUpgrade } = useEntitlement();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<ExtractProgress | null>(null);
@@ -41,9 +41,8 @@ export function FileDropzone({
       toast.error(t("invalid_file"));
       return;
     }
-    // Fast pre-check: if the free trial is already exhausted, prompt to upgrade
-    // before spending time on extraction.
-    if (entitlement && !entitlement.allowed) {
+    // Only block when entitlement has loaded and confirms the free trial is exhausted.
+    if (!loading && entitlement && !entitlement.allowed) {
       openUpgrade();
       return;
     }
@@ -52,11 +51,7 @@ export function FileDropzone({
       const result = await extractDocument(file, setProgress);
       // Server-enforced, atomic consumption of one processing slot.
       const ok = await tryConsume({ fileName: file.name, fileSize: file.size, tool });
-      if (!ok) {
-        // tryConsume already opened the upgrade modal.
-        toast.error(t("free_limit_reached"));
-        return;
-      }
+      if (!ok) return;
       const doc: ActiveDocument = {
         ...result,
         name: file.name,
