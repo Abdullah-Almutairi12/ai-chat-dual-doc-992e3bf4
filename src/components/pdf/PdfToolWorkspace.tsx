@@ -15,7 +15,7 @@ import { getPdfTool, type PdfTool } from "@/lib/pdf-tools";
 import { sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/security";
 import { useEntitlement } from "@/lib/entitlement";
 import { addDocument } from "@/lib/documents";
-import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@/lib/storage.client";
+import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@/lib/pdf-storage";
 
 type Props = { toolId: string };
 
