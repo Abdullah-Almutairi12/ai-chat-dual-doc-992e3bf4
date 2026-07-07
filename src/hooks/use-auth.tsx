@@ -1,29 +1,34 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
 
+type AuthContextValue = {
+  user: User | null;
+  isReady: boolean;
+  isAuthenticated: boolean;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
 /**
- * Session-aware auth hook.
- * - getSession() first restores the session from storage (fixes the race where
- *   INITIAL_SESSION fires before the session is available).
- * - onAuthStateChange keeps the UI in sync with live sign-in / sign-out events.
+ * Single Supabase auth subscription for the whole app.
+ * - getSession() restores the session from storage on first load.
+ * - onAuthStateChange keeps Navbar, sidebar, and other UI in sync after OAuth.
  */
-export function useAuth() {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    // Restore session from storage on mount.
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setUser(data.session?.user ?? null);
       setIsReady(true);
     });
 
-    // React to subsequent sign-in / sign-out / token refresh events.
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setIsReady(true);
@@ -35,5 +40,18 @@ export function useAuth() {
     };
   }, []);
 
-  return { user, isReady, isAuthenticated: !!user };
+  const value = useMemo(
+    () => ({ user, isReady, isAuthenticated: !!user }),
+    [user, isReady],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return ctx;
 }
