@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
 import { ArrowRight, Sparkles } from "lucide-react";
 
+import { PdfToolLink } from "@/components/pdf/PdfToolLink";
 import { useI18n } from "@/lib/i18n";
 import { PDF_TOOL_CATEGORIES, pdfTools, toolsByCategory, type PdfTool } from "@/lib/pdf-tools";
 
@@ -9,10 +9,8 @@ function ToolCard({ tool, index }: { tool: PdfTool; index: number }) {
   const arrow = dir === "rtl" ? "rotate-180" : "";
 
   return (
-    <Link
-      to="/tools/$toolId"
-      params={{ toolId: tool.id }}
-      preload="intent"
+    <PdfToolLink
+      toolId={tool.id}
       className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-elegant animate-fade-up cursor-pointer"
       style={{ animationDelay: `${index * 40}ms` }}
       aria-label={`${t(tool.titleKey)} — ${t("open_tool")}`}
@@ -26,7 +24,7 @@ function ToolCard({ tool, index }: { tool: PdfTool; index: number }) {
         {t("open_tool")}
         <ArrowRight className={`h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 ${arrow}`} />
       </span>
-    </Link>
+    </PdfToolLink>
   );
 }
 
@@ -90,11 +88,9 @@ export function PdfToolsPreviewGrid({ limit = 8 }: { limit?: number }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {preview.map((tool) => (
-        <Link
+        <PdfToolLink
           key={tool.id}
-          to="/tools/$toolId"
-          params={{ toolId: tool.id }}
-          preload="intent"
+          toolId={tool.id}
           className="group rounded-2xl border border-border bg-card p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant cursor-pointer"
           aria-label={`${t(tool.titleKey)} — ${t("open_tool")}`}
         >
@@ -106,7 +102,7 @@ export function PdfToolsPreviewGrid({ limit = 8 }: { limit?: number }) {
             {t("open_tool")}
             <ArrowRight className={`h-3 w-3 ${arrow}`} />
           </span>
-        </Link>
+        </PdfToolLink>
       ))}
     </div>
   );
