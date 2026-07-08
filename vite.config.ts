@@ -21,7 +21,7 @@ export default defineConfig({
     envPrefix: ["VITE_", "APP_"],
     ssr: {
       // Keep browser-only PDF/Office libraries out of the SSR server bundle.
-      external: ["pdfjs-dist", "pdf-lib", "docx", "xlsx", "jspdf", "pptxgenjs", "tesseract.js"],
+      external: ["pdfjs-dist", "pdf-lib", "docx", "xlsx", "jspdf", "pptxgenjs", "tesseract.js", "@napi-rs/canvas"],
     },
     optimizeDeps: {
       include: ["pdfjs-dist", "pdf-lib"],

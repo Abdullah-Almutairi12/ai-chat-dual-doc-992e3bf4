@@ -77,6 +77,8 @@ export const SERVER_ENV_ALIASES = {
   tapSecret: ["TAP_SECRET_KEY"],
   cronSecret: ["CRON_SECRET"],
   resendApiKey: ["RESEND_API_KEY"],
+  openaiApiKey: ["OPENAI_API_KEY"],
+  anthropicApiKey: ["ANTHROPIC_API_KEY"],
   appOrigin: ["APP_ORIGIN", "VERCEL_URL", "VITE_APP_ORIGIN"],
   tapWebhookUrl: ["TAP_WEBHOOK_URL"],
 } as const;

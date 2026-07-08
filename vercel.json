@@ -7,5 +7,11 @@
     "env": {
       "NITRO_PRESET": "vercel"
     }
+  },
+  "functions": {
+    "api/**": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
   }
 }
