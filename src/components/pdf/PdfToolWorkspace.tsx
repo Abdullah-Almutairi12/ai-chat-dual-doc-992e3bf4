@@ -90,39 +90,53 @@ export function PdfToolWorkspace({ toolId }: Props) {
     }
   };
 
-  const consumeSlot = async (batch: File[]) => {
-    if (!user) {
-      toast.error(t("pdf_need_login"));
-      navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
-      return false;
-    }
-    if (!loading && entitlement && !entitlement.allowed) {
-      openUpgrade();
-      return false;
-    }
+  const reserveSlot = useCallback(
+    async (batch: File[]): Promise<boolean> => {
+      if (!user) {
+        toast.error(t("pdf_need_login"));
+        navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
+        return false;
+      }
 
-    const meta = {
-      fileName: batch[0]?.name,
-      fileSize: batch[0]?.size,
-      tool: toolId,
-    };
-
-    const viaApi = await consumeProcessingSlot(meta);
-    if (viaApi) {
-      if (!viaApi.allowed) {
+      if (!loading && entitlement && !entitlement.allowed) {
         openUpgrade();
         return false;
       }
-      await refreshEntitlement();
-      if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
-      return true;
-    }
 
-    const ok = await tryConsume(meta);
-    if (!ok) return false;
-    if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
-    return true;
-  };
+      const meta = {
+        fileName: batch[0]?.name,
+        fileSize: batch[0]?.size,
+        tool: toolId,
+      };
+
+      const viaApi = await consumeProcessingSlot(meta);
+      if (viaApi.ok) {
+        if (!viaApi.allowed) {
+          openUpgrade();
+          void refreshEntitlement();
+          return false;
+        }
+        void refreshEntitlement();
+        if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
+        return true;
+      }
+
+      console.warn("[PdfToolWorkspace] consume API failed", viaApi.error);
+      const ok = await tryConsume(meta);
+      if (ok) {
+        if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
+        return true;
+      }
+
+      if (!loading && entitlement && !entitlement.allowed) {
+        return false;
+      }
+
+      // Reservation failed but user still has allowance — proceed with processing.
+      return true;
+    },
+    [user, loading, entitlement, toolId, t, navigate, openUpgrade, tryConsume, refreshEntitlement],
+  );
 
   const persistUploads = async (batch: File[], output?: { blob: Blob; name: string }) => {
     if (!user) return;
@@ -145,26 +159,27 @@ export function PdfToolWorkspace({ toolId }: Props) {
         toast.error(t("invalid_file"));
         return;
       }
-      if (runLockRef.current) return;
+      if (runLockRef.current) {
+        toast.info(t("pdf_processing"));
+        return;
+      }
       runLockRef.current = true;
-
-      if (!user) {
-        toast.error(t("pdf_need_login"));
-        navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
-        runLockRef.current = false;
-        return;
-      }
-
-      if (!(await consumeSlot(batch))) {
-        runLockRef.current = false;
-        return;
-      }
 
       setProcessing(true);
       setProgress({ label: t("pdf_processing"), percent: 5, stage: "" });
       setResultBlob(null);
 
       try {
+        if (!user) {
+          toast.error(t("pdf_need_login"));
+          navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
+          return;
+        }
+
+        if (!(await reserveSlot(batch))) {
+          return;
+        }
+
         const base = sanitizeFileName(batch[0].name.replace(/\.\w+$/i, ""));
         const pdf = await import("@/lib/pdf/client-api");
 
@@ -309,6 +324,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
       tryConsume,
       openUpgrade,
       refreshEntitlement,
+      reserveSlot,
       wmText,
       wmOpacity,
       wmRotation,

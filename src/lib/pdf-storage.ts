@@ -75,33 +75,47 @@ export async function consumeProcessingSlot(meta: {
   fileName?: string;
   fileSize?: number;
   tool?: string;
-}): Promise<{ allowed: boolean; remaining: number | null; subscribed: boolean } | null> {
+}): Promise<
+  | { ok: true; allowed: boolean; remaining: number | null; subscribed: boolean }
+  | { ok: false; error: string }
+> {
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
-  if (!token) return null;
+  if (!token) return { ok: false, error: "no_session" };
 
-  const res = await fetch("/api/pdf/consume", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(meta),
-  });
-  const body = (await res.json().catch(() => ({}))) as {
-    ok?: boolean;
-    allowed?: boolean;
-    remaining?: number | null;
-    subscribed?: boolean;
-    error?: string;
-  };
-  if (!res.ok || !body.ok) {
-    console.warn("[storage] consume failed", body.error ?? res.status);
-    return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+
+  try {
+    const res = await fetch("/api/pdf/consume", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(meta),
+      signal: controller.signal,
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      allowed?: boolean;
+      remaining?: number | null;
+      subscribed?: boolean;
+      error?: string;
+    };
+    if (!res.ok || !body.ok) {
+      return { ok: false, error: body.error ?? `http_${res.status}` };
+    }
+    return {
+      ok: true,
+      allowed: body.allowed === true,
+      remaining: body.remaining ?? null,
+      subscribed: body.subscribed === true,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "network_error";
+    return { ok: false, error: message };
+  } finally {
+    clearTimeout(timer);
   }
-  return {
-    allowed: body.allowed === true,
-    remaining: body.remaining ?? null,
-    subscribed: body.subscribed === true,
-  };
 }

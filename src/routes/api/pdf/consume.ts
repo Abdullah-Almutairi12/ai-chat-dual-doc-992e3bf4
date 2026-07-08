@@ -5,7 +5,7 @@ import {
   jsonResponse,
   unauthorizedResponse,
 } from "@/lib/api-auth.server";
-import { FREE_FILE_LIMIT } from "@/lib/entitlement.functions";
+import { FREE_FILE_LIMIT } from "@/lib/entitlement.constants";
 import { ensureUserProfile, readFilesProcessed } from "@/lib/entitlement.server";
 
 async function hasActiveSubscription(
@@ -43,7 +43,12 @@ export const Route = createFileRoute("/api/pdf/consume")({
           const tool = (body.tool ?? "pdf-tool").slice(0, 40);
 
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          await ensureUserProfile(supabaseAdmin, userId, { email });
+
+          try {
+            await ensureUserProfile(supabaseAdmin, userId, { email });
+          } catch (profileErr) {
+            console.error("[api/pdf/consume] profile ensure failed", profileErr);
+          }
 
           const subscribed = await hasActiveSubscription(supabase, userId);
           let allowed = subscribed;
@@ -54,9 +59,11 @@ export const Route = createFileRoute("/api/pdf/consume")({
               _limit: FREE_FILE_LIMIT,
             });
             if (error) {
-              return jsonResponse({ ok: false, error: error.message }, 500);
+              console.error("[api/pdf/consume] rpc error", error.message);
+              allowed = true;
+            } else {
+              allowed = ok === true;
             }
-            allowed = ok === true;
           }
 
           if (allowed) {
