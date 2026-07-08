@@ -4,4 +4,7 @@ import { defineConfig } from "nitro/config";
 export default defineConfig({
   preset: "vercel",
   compatibilityDate: "2024-11-01",
+  routeRules: {
+    "/api/pdf/convert-vision": { maxDuration: 60 },
+  },
 });
