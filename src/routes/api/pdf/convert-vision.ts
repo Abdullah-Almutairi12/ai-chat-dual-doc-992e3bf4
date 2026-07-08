@@ -65,6 +65,9 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
               "content-disposition": `attachment; filename="${encodeURIComponent(outName)}"`,
               "cache-control": "no-store",
               "x-vision-provider": result.provider,
+              "x-vision-model": result.model,
+              "x-vision-preferred": result.preferredProvider,
+              "x-vision-fallback": result.usedProviderFallback ? "true" : "false",
               "x-vision-pages": String(result.pageCount),
             },
           });

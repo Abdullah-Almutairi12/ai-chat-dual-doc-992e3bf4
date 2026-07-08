@@ -16,6 +16,9 @@ export type VisionConvertResult = {
   extension: string;
   pageCount: number;
   provider: string;
+  model: string;
+  preferredProvider: string;
+  usedProviderFallback: boolean;
 };
 
 export type VisionConvertProgress = {
@@ -45,7 +48,7 @@ export async function convertPdfWithVision(
   const pages = rendered.slice(0, pageCount);
 
   onProgress?.({ stage: "vision", percent: 15, pageCount });
-  const extracted = await extractAllPages(
+  const { data: extracted, lastMeta } = await extractAllPages(
     config,
     tool,
     pages.map((p) => ({ pageNumber: p.pageNumber, base64: p.base64 })),
@@ -53,14 +56,21 @@ export async function convertPdfWithVision(
 
   onProgress?.({ stage: "build", percent: 85, pageCount });
 
+  const resultBase = {
+    pageCount,
+    provider: lastMeta.provider,
+    model: lastMeta.model,
+    preferredProvider: config.preferredProvider,
+    usedProviderFallback: config.keyFallback || lastMeta.usedProviderFallback,
+  };
+
   if (tool === "pdf-word") {
     const buffer = await buildDocxFromVisionPages(extracted as VisionPage[]);
     return {
       buffer,
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       extension: "docx",
-      pageCount,
-      provider: config.provider,
+      ...resultBase,
     };
   }
 
@@ -69,8 +79,7 @@ export async function convertPdfWithVision(
     buffer,
     mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     extension: "pptx",
-    pageCount,
-    provider: config.provider,
+    ...resultBase,
   };
 }
 

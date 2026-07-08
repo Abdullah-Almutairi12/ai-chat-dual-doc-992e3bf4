@@ -1,4 +1,10 @@
-import type { VisionConfig } from "@/lib/pdf/vision/config.server";
+import {
+  alternateProvider,
+  modelForProvider,
+  providerHasKey,
+  type VisionConfig,
+  type VisionProvider,
+} from "@/lib/pdf/vision/config.server";
 import {
   PPT_PAGE_SYSTEM_PROMPT,
   pptPageUserPrompt,
@@ -13,6 +19,12 @@ import {
   type VisionSlide,
 } from "@/lib/pdf/vision/schema";
 
+export type VisionCallMeta = {
+  provider: VisionProvider;
+  model: string;
+  usedProviderFallback: boolean;
+};
+
 function stripJsonFences(raw: string): string {
   const trimmed = raw.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/i);
@@ -23,12 +35,19 @@ function parseJson<T>(raw: string): T {
   return JSON.parse(stripJsonFences(raw)) as T;
 }
 
+/** OpenAI Vision — gpt-4o (or OPENAI_VISION_MODEL) with high-detail page images. */
 async function callOpenAiVision(
   config: VisionConfig,
   systemPrompt: string,
   userText: string,
   imageBase64: string,
 ): Promise<string> {
+  if (!config.openaiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  const model = config.openaiModel || "gpt-4o";
+
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -36,7 +55,7 @@ async function callOpenAiVision(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: config.openaiModel,
+      model,
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
@@ -71,16 +90,21 @@ async function callOpenAiVision(
   return content;
 }
 
+/** Anthropic Vision — Claude 3.5 Sonnet (or ANTHROPIC_VISION_MODEL). */
 async function callAnthropicVision(
   config: VisionConfig,
   systemPrompt: string,
   userText: string,
   imageBase64: string,
 ): Promise<string> {
+  if (!config.anthropicKey) {
+    throw new Error("ANTHROPIC_API_KEY is not configured");
+  }
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "x-api-key": config.anthropicKey!,
+      "x-api-key": config.anthropicKey,
       "anthropic-version": "2023-06-01",
       "Content-Type": "application/json",
     },
@@ -117,18 +141,62 @@ async function callAnthropicVision(
   return text;
 }
 
+async function callVisionProvider(
+  config: VisionConfig,
+  provider: VisionProvider,
+  systemPrompt: string,
+  userText: string,
+  imageBase64: string,
+): Promise<string> {
+  if (provider === "openai") {
+    return callOpenAiVision(config, systemPrompt, userText, imageBase64);
+  }
+  return callAnthropicVision(config, systemPrompt, userText, imageBase64);
+}
+
+/**
+ * Call the configured Vision provider with symmetric runtime fallback:
+ * if the primary provider errors and the alternate key exists, retry once.
+ */
 async function callVisionModel(
   config: VisionConfig,
   systemPrompt: string,
   userText: string,
   imageBase64: string,
-): Promise<string> {
-  if (config.provider === "anthropic") {
-    if (!config.anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-    return callAnthropicVision(config, systemPrompt, userText, imageBase64);
+): Promise<{ content: string; meta: VisionCallMeta }> {
+  const primary = config.provider;
+  const fallback = alternateProvider(primary);
+
+  try {
+    const content = await callVisionProvider(config, primary, systemPrompt, userText, imageBase64);
+    return {
+      content,
+      meta: {
+        provider: primary,
+        model: modelForProvider(config, primary),
+        usedProviderFallback: false,
+      },
+    };
+  } catch (primaryErr) {
+    if (!providerHasKey(config, fallback)) {
+      throw primaryErr;
+    }
+
+    console.warn(
+      `[vision] ${primary} (${modelForProvider(config, primary)}) failed — falling back to ${fallback}`,
+      primaryErr instanceof Error ? primaryErr.message : primaryErr,
+    );
+
+    const content = await callVisionProvider(config, fallback, systemPrompt, userText, imageBase64);
+    return {
+      content,
+      meta: {
+        provider: fallback,
+        model: modelForProvider(config, fallback),
+        usedProviderFallback: true,
+      },
+    };
   }
-  if (!config.openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-  return callOpenAiVision(config, systemPrompt, userText, imageBase64);
 }
 
 /** Run Vision OCR/layout extraction on one page image. */
@@ -137,20 +205,20 @@ export async function extractWordPage(
   pageNumber: number,
   pageCount: number,
   imageBase64: string,
-): Promise<VisionPage> {
-  const raw = await callVisionModel(
+): Promise<{ page: VisionPage; meta: VisionCallMeta }> {
+  const { content, meta } = await callVisionModel(
     config,
     WORD_PAGE_SYSTEM_PROMPT,
     wordPageUserPrompt(pageNumber, pageCount),
     imageBase64,
   );
-  const parsed = parseJson<unknown>(raw);
+  const parsed = parseJson<unknown>(content);
   const result = VisionPageSchema.safeParse(parsed);
   if (!result.success) {
     console.error("[vision] invalid word page JSON", result.error.flatten());
-    return { pageNumber, blocks: [] };
+    return { page: { pageNumber, blocks: [] }, meta };
   }
-  return { ...result.data, pageNumber };
+  return { page: { ...result.data, pageNumber }, meta };
 }
 
 /** Run Vision OCR/layout extraction for one slide/page. */
@@ -159,37 +227,54 @@ export async function extractSlidePage(
   pageNumber: number,
   pageCount: number,
   imageBase64: string,
-): Promise<VisionSlide> {
-  const raw = await callVisionModel(
+): Promise<{ slide: VisionSlide; meta: VisionCallMeta }> {
+  const { content, meta } = await callVisionModel(
     config,
     PPT_PAGE_SYSTEM_PROMPT,
     pptPageUserPrompt(pageNumber, pageCount),
     imageBase64,
   );
-  const parsed = parseJson<unknown>(raw);
+  const parsed = parseJson<unknown>(content);
   const result = VisionSlideSchema.safeParse(parsed);
   if (!result.success) {
     console.error("[vision] invalid slide JSON", result.error.flatten());
-    return { slideNumber: pageNumber };
+    return { slide: { slideNumber: pageNumber }, meta };
   }
-  return { ...result.data, slideNumber: pageNumber };
+  return { slide: { ...result.data, slideNumber: pageNumber }, meta };
 }
 
 export async function extractAllPages(
   config: VisionConfig,
   tool: VisionConvertTool,
   pages: { pageNumber: number; base64: string }[],
-): Promise<VisionPage[] | VisionSlide[]> {
+): Promise<{ data: VisionPage[] | VisionSlide[]; lastMeta: VisionCallMeta }> {
   const pageCount = pages.length;
-  const results: (VisionPage | VisionSlide)[] = [];
+  let lastMeta: VisionCallMeta = {
+    provider: config.provider,
+    model: modelForProvider(config, config.provider),
+    usedProviderFallback: false,
+  };
 
-  for (const page of pages) {
-    if (tool === "pdf-word") {
-      results.push(await extractWordPage(config, page.pageNumber, pageCount, page.base64));
-    } else {
-      results.push(await extractSlidePage(config, page.pageNumber, pageCount, page.base64));
+  if (tool === "pdf-word") {
+    const results: VisionPage[] = [];
+    for (const page of pages) {
+      const { page: extracted, meta } = await extractWordPage(
+        config,
+        page.pageNumber,
+        pageCount,
+        page.base64,
+      );
+      results.push(extracted);
+      lastMeta = meta;
     }
+    return { data: results, lastMeta };
   }
 
-  return results as VisionPage[] | VisionSlide[];
+  const results: VisionSlide[] = [];
+  for (const page of pages) {
+    const { slide, meta } = await extractSlidePage(config, page.pageNumber, pageCount, page.base64);
+    results.push(slide);
+    lastMeta = meta;
+  }
+  return { data: results, lastMeta };
 }
