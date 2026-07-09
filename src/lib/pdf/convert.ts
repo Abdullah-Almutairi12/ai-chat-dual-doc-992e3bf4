@@ -9,7 +9,7 @@ import {
   resolveJsPdfConstructor,
 } from "./runtime";
 
-export type ConvertProgress = { stage: string; percent: number; page?: number; pageCount?: number };
+export type ConvertProgress = import("./progress").PdfProgress;
 
 type ProgressFn = (p: ConvertProgress) => void;
 

@@ -1,4 +1,6 @@
+import { yieldToMain } from "./batch";
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { pagePercent, type ProgressFn } from "./progress";
 import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export type WatermarkOptions = {
@@ -10,15 +12,22 @@ export type WatermarkOptions = {
   fontSize?: number;
 };
 
-export async function addWatermark(file: File, opts: WatermarkOptions): Promise<Blob> {
+export async function addWatermark(
+  file: File,
+  opts: WatermarkOptions,
+  onProgress?: ProgressFn,
+): Promise<Blob> {
   requireBrowser();
   const { rgb, degrees } = await loadPdfLibModule();
   const doc = await loadPdfLib(file);
   const opacity = opts.opacity ?? 0.3;
   const rotation = opts.rotation ?? -30;
   const pages = doc.getPages();
+  const pageCount = pages.length;
 
-  for (const page of pages) {
+  for (let i = 0; i < pages.length; i++) {
+    await yieldToMain();
+    const page = pages[i];
     const { width, height } = page.getSize();
     if (opts.imageBytes) {
       const img = await doc.embedPng(opts.imageBytes).catch(() => doc.embedJpg(opts.imageBytes!));
@@ -59,11 +68,12 @@ export async function addWatermark(file: File, opts: WatermarkOptions): Promise<
         rotate: degrees(rotation),
       });
     }
+    onProgress?.(pagePercent(i + 1, pageCount, { stage: "watermark" }));
   }
   return pdfLibToBlob(doc);
 }
 
-export async function removeWatermark(file: File, onProgress?: (p: number) => void): Promise<Blob> {
+export async function removeWatermark(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const { PDFDocument } = await loadPdfLibModule();
   const { loadPdfjs, renderPageToCanvas } = await import("./loader");
@@ -73,13 +83,14 @@ export async function removeWatermark(file: File, onProgress?: (p: number) => vo
   const newDoc = await PDFDocument.create();
 
   for (let i = 1; i <= pdf.numPages; i++) {
+    await yieldToMain();
     const { canvas } = await renderPageToCanvas(pdf, i, 2);
     cleanWatermarkArtifacts(canvas);
     const pngBytes = await canvasToPng(canvas);
     const page = newDoc.addPage([canvas.width / 2, canvas.height / 2]);
     const img = await newDoc.embedPng(pngBytes);
     page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
-    onProgress?.(Math.round((i / pdf.numPages) * 100));
+    onProgress?.(pagePercent(i, pdf.numPages, { stage: "scan" }));
   }
   return pdfLibToBlob(newDoc);
 }

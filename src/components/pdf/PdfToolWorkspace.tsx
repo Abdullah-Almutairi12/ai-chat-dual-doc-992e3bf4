@@ -17,6 +17,9 @@ import { useEntitlement } from "@/lib/entitlement";
 import { addDocument } from "@/lib/documents";
 import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@/lib/pdf-storage";
 import { runMasterConversion } from "@/lib/pdf/master-engine-client";
+import { validateBatchSize } from "@/lib/pdf/batch";
+import type { PdfProgress } from "@/lib/pdf/progress";
+import { finalizeOutput, logToolError } from "@/lib/pdf/tool-runtime";
 
 type Props = { toolId: string };
 
@@ -28,7 +31,9 @@ export function PdfToolWorkspace({ toolId }: Props) {
   const { tryConsume, openUpgrade, entitlement, loading, refresh: refreshEntitlement } = useEntitlement();
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState({ label: "", percent: 0, stage: "" });
+  const [progress, setProgress] = useState<
+    PdfProgress & { label: string }
+  >({ label: "", percent: 0, stage: "" });
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultName, setResultName] = useState("output.pdf");
   const runLockRef = useRef(false);
@@ -49,6 +54,20 @@ export function PdfToolWorkspace({ toolId }: Props) {
   const sigCanvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 
+  const reportProgress = useCallback(
+    (p: PdfProgress) => {
+      setProgress({
+        label: t("pdf_processing"),
+        percent: p.percent,
+        stage: p.stage,
+        page: p.page,
+        pageCount: p.pageCount,
+        fileIndex: p.fileIndex,
+        fileCount: p.fileCount,
+      });
+    },
+    [t],
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const runRef = useRef<(batch?: File[]) => Promise<void>>(async () => {});
 
@@ -186,71 +205,85 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
         if (tool!.convertMode) {
           const mode = tool!.convertMode;
-          const result = await runMasterConversion(
-            mode,
-            batch[0],
-            { imageFiles: batch },
-            (p) => setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
-          );
+          const result = await runMasterConversion(mode, batch[0], { imageFiles: batch }, reportProgress);
 
           if (result.blob) {
-            setResultBlob(result.blob);
-            setResultName(`${base}.${result.ext}`);
-            await persistUploads(batch, { blob: result.blob, name: `${base}.${result.ext}` });
-          } else if (result.blobs) {
-            for (const b of result.blobs) pdf.downloadBlob(b.blob, b.name);
+            const valid = await finalizeOutput(result.blob, `${base}.${result.ext}`);
+            if (valid) {
+              setResultBlob(valid);
+              setResultName(`${base}.${result.ext}`);
+              await persistUploads(batch, { blob: valid, name: `${base}.${result.ext}` });
+              toast.success(t("convert_done"));
+            }
+          } else if (result.blobs?.length) {
+            let downloaded = 0;
+            for (const b of result.blobs) {
+              if (await pdf.validatedDownloadBlob(b.blob, b.name)) downloaded++;
+            }
             await persistUploads(batch);
-            toast.success(t("convert_done"));
+            if (downloaded > 0) toast.success(t("convert_done"));
           }
-          setProcessing(false);
-          runLockRef.current = false;
           return;
         }
 
-        let blob: Blob;
+        if (tool!.id === "merge") {
+          const batchCheck = validateBatchSize(batch);
+          if (!batchCheck.ok) {
+            logToolError(toolId, new Error(`batch_${batchCheck.reason}`));
+            return;
+          }
+        }
+
+        const onProgress = reportProgress;
+        let blob: Blob | null = null;
         let outName = `${base}.pdf`;
+
         switch (tool!.id) {
         case "merge":
-          blob = await pdf.mergePdfs(batch);
+          blob = await pdf.mergePdfs(batch, onProgress);
           outName = `${base}-merged.pdf`;
           break;
         case "split": {
-          const parts = await pdf.splitEveryPage(batch[0]);
-          for (const [i, b] of parts.entries()) {
-            pdf.downloadBlob(b, `${base}-part-${i + 1}.pdf`);
+          const parts = await pdf.splitEveryPage(batch[0], onProgress);
+          let downloaded = 0;
+          for (const [i, part] of parts.entries()) {
+            if (await pdf.validatedDownloadBlob(part, `${base}-part-${i + 1}.pdf`)) downloaded++;
           }
           await persistUploads(batch);
-          toast.success(t("convert_done"));
-          setProcessing(false);
-          runLockRef.current = false;
+          if (downloaded > 0) toast.success(t("convert_done"));
           return;
         }
         case "rotate":
-          blob = await pdf.rotatePages(batch[0], [], rotateAngle);
+          blob = await pdf.rotatePages(batch[0], [], rotateAngle, onProgress);
           outName = `${base}-rotated.pdf`;
           break;
         case "delete-pages": {
           const nums = deletePageStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
-          blob = await pdf.deletePages(batch[0], nums);
+          blob = await pdf.deletePages(batch[0], nums, onProgress);
           outName = `${base}-edited.pdf`;
           break;
         }
         case "watermark-add":
-          blob = await pdf.addWatermark(batch[0], { text: wmText, opacity: wmOpacity, rotation: wmRotation });
+          blob = await pdf.addWatermark(
+            batch[0],
+            { text: wmText, opacity: wmOpacity, rotation: wmRotation },
+            onProgress,
+          );
           outName = `${base}-watermarked.pdf`;
           break;
         case "watermark-remove":
-          blob = await pdf.removeWatermark(batch[0], (p) =>
-            setProgress({ label: t("pdf_wm_scanning"), percent: p, stage: "" }),
-          );
+          blob = await pdf.removeWatermark(batch[0], onProgress);
           outName = `${base}-clean.pdf`;
           break;
         case "compress":
-          blob = await pdf.optimizePdf(batch[0], compressLevel);
+          blob = await pdf.optimizePdf(batch[0], compressLevel, onProgress);
           outName = `${base}-optimized.pdf`;
           break;
         case "add-text":
-          blob = await pdf.addTextToPdf(batch[0], [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }]);
+          blob = await pdf.addTextToPdf(
+            batch[0],
+            [{ page: 1, x: 72, y: 720, text: addTextContent || "Text" }],
+          );
           outName = `${base}-edited.pdf`;
           break;
         case "redact":
@@ -261,19 +294,25 @@ export function PdfToolWorkspace({ toolId }: Props) {
           break;
         case "reorder": {
           const order = reorderStr.split(/[,\s]+/).map(Number).filter((n) => n > 0);
-          blob = await pdf.reorderPages(batch[0], order.length ? order : [1]);
+          blob = await pdf.reorderPages(batch[0], order.length ? order : [1], onProgress);
           outName = `${base}-reordered.pdf`;
           break;
         }
         case "annotate":
-          blob = await pdf.applyAnnotations(batch[0], [
-            { type: "highlight", page: 1, x: 72, y: 700, width: 200, height: 16 },
-          ]);
+          blob = await pdf.applyAnnotations(
+            batch[0],
+            [{ type: "highlight", page: 1, x: 72, y: 700, width: 200, height: 16 }],
+            onProgress,
+          );
           outName = `${base}-annotated.pdf`;
           break;
         case "stamp": {
           const bytes = pdf.typedSignatureToBytes("STAMP");
-          blob = await pdf.applySignatures(batch[0], [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }]);
+          blob = await pdf.applySignatures(
+            batch[0],
+            [{ page: 1, x: 400, y: 100, width: 80, height: 80, imageBytes: bytes, label: "Stamp" }],
+            onProgress,
+          );
           outName = `${base}-stamped.pdf`;
           break;
         }
@@ -283,33 +322,49 @@ export function PdfToolWorkspace({ toolId }: Props) {
             : sigCanvasRef.current
               ? await pdf.drawSignatureToBytes(sigCanvasRef.current)
               : pdf.typedSignatureToBytes("Signed");
-          blob = await pdf.applySignatures(batch[0], [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }]);
+          blob = await pdf.applySignatures(
+            batch[0],
+            [{ page: 1, x: 72, y: 100, width: 160, height: 50, imageBytes: bytes }],
+            onProgress,
+          );
           outName = `${base}-signed.pdf`;
           break;
         }
         case "protect":
-          blob = await pdf.protectPdf(batch[0], { userPassword: protectPass, allowPrinting: false, allowCopying: false });
+          blob = await pdf.protectPdf(
+            batch[0],
+            { userPassword: protectPass, allowPrinting: false, allowCopying: false },
+            onProgress,
+          );
           outName = `${base}-protected.pdf`;
           break;
-        case "unlock":
-          blob = await pdf.removeProtection(batch[0], unlockPass);
+        case "unlock": {
+          const { removeProtection, unlockPdfFallback } = await import("@/lib/pdf/protect");
+          blob = await removeProtection(batch[0], unlockPass, onProgress).catch(() => null);
+          if (!blob) {
+            logToolError(toolId, new Error("unlock_primary_failed"));
+            blob = await unlockPdfFallback(batch[0]).catch(() => null);
+          }
           outName = `${base}-unlocked.pdf`;
           break;
+        }
         default:
-          toast.error(t("pdf_tool_not_found"));
-          setProcessing(false);
-          runLockRef.current = false;
           return;
-      }
+        }
 
-      setResultBlob(blob);
-      setResultName(outName);
-      await persistUploads(batch, { blob, name: outName });
-      toast.success(t("convert_done"));
+        const valid = await finalizeOutput(blob, outName);
+        if (!valid) {
+          logToolError(toolId, new Error("invalid_output"));
+          return;
+        }
+
+        setResultBlob(valid);
+        setResultName(outName);
+        await persistUploads(batch, { blob: valid, name: outName });
+        toast.success(t("convert_done"));
     } catch (err) {
-      console.error("[PdfToolWorkspace]", err);
-      const message = err instanceof Error ? err.message : t("extract_failed");
-      toast.error(message || t("extract_failed"));
+      logToolError(toolId, err);
+      // Never expose raw API/technical errors — silent log only
     } finally {
       setProcessing(false);
       runLockRef.current = false;
@@ -327,6 +382,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
       tryConsume,
       openUpgrade,
       refreshEntitlement,
+      reportProgress,
       reserveSlot,
       wmText,
       wmOpacity,
@@ -451,7 +507,15 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
       {processing && (
         <div className="mt-6">
-          <WorkflowLoader label={progress.label} percent={progress.percent} stage={progress.stage} />
+          <WorkflowLoader
+            label={progress.label}
+            percent={progress.percent}
+            stage={progress.stage}
+            page={progress.page}
+            pageCount={progress.pageCount}
+            fileIndex={progress.fileIndex}
+            fileCount={progress.fileCount}
+          />
         </div>
       )}
 

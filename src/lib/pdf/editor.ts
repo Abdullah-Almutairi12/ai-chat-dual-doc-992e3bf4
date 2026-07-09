@@ -1,6 +1,6 @@
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { stageProgress, type ProgressFn } from "./progress";
 import { loadPdfLibModule, requireBrowser } from "./runtime";
-
 export type AnnotationType = "highlight" | "text" | "rectangle" | "redact";
 
 export type Annotation = {
@@ -14,10 +14,10 @@ export type Annotation = {
   color?: [number, number, number];
 };
 
-export async function applyAnnotations(file: File, annotations: Annotation[]): Promise<Blob> {
+export async function applyAnnotations(file: File, annotations: Annotation[], onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
-  const { rgb, StandardFonts } = await loadPdfLibModule();
-  const doc = await loadPdfLib(file);
+  onProgress?.(stageProgress("annotate", 15));
+  const { rgb, StandardFonts } = await loadPdfLibModule();  const doc = await loadPdfLib(file);
   const font = await doc.embedFont(StandardFonts.Helvetica);
 
   for (const ann of annotations) {
@@ -69,6 +69,7 @@ export async function applyAnnotations(file: File, annotations: Annotation[]): P
         break;
     }
   }
+  onProgress?.(stageProgress("pack", 90));
   return pdfLibToBlob(doc);
 }
 

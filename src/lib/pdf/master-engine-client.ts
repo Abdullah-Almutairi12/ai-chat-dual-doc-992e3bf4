@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import type { ConvertProgress } from "@/lib/pdf/convert";
 import { extForMasterTool, isMasterPdfTool, type MasterConvertTool } from "@/lib/pdf/vision/schema";
+import { finalizeOutput } from "@/lib/pdf/tool-runtime";
 
 export type { MasterConvertTool };
 export { isMasterPdfTool };
@@ -61,8 +62,15 @@ export async function convertViaMasterEngine(
         return null;
       }
 
+      const ext = extForMasterTool(tool);
+      const valid = await finalizeOutput(blob, `output.${ext}`);
+      if (!valid) {
+        console.info("[master-engine] invalid output — using local OCR fallback");
+        return null;
+      }
+
       onProgress?.({ stage: "done", percent: 100 });
-      return { blob, ext: extForMasterTool(tool) };
+      return { blob: valid, ext };
     } finally {
       clearTimeout(timer);
     }

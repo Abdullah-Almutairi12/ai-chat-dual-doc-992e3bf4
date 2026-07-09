@@ -1,6 +1,6 @@
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { stageProgress, type ProgressFn } from "./progress";
 import { requireBrowser } from "./runtime";
-
 export type SignatureOptions = {
   page: number;
   x: number;
@@ -11,10 +11,10 @@ export type SignatureOptions = {
   label?: string;
 };
 
-export async function applySignatures(file: File, signatures: SignatureOptions[]): Promise<Blob> {
+export async function applySignatures(file: File, signatures: SignatureOptions[], onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
-  const doc = await loadPdfLib(file);
-  for (const sig of signatures) {
+  onProgress?.(stageProgress("sign", 20));
+  const doc = await loadPdfLib(file);  for (const sig of signatures) {
     const page = doc.getPage(sig.page - 1);
     if (!page) continue;
     const img = await doc.embedPng(sig.imageBytes).catch(() => doc.embedJpg(sig.imageBytes));
@@ -33,6 +33,7 @@ export async function applySignatures(file: File, signatures: SignatureOptions[]
       });
     }
   }
+  onProgress?.(stageProgress("pack", 90));
   return pdfLibToBlob(doc);
 }
 

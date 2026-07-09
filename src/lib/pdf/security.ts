@@ -72,3 +72,15 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Validate output bytes before triggering download — skips corrupt files silently. */
+export async function validatedDownloadBlob(blob: Blob, fileName: string): Promise<boolean> {
+  const { ensureValidOutput, formatFromFileName } = await import("@/lib/pdf/validate-output");
+  const valid = await ensureValidOutput(blob, formatFromFileName(fileName));
+  if (!valid) {
+    console.warn("[security] download blocked — invalid output", fileName);
+    return false;
+  }
+  downloadBlob(valid, fileName);
+  return true;
+}

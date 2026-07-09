@@ -1,9 +1,15 @@
+import { yieldToMain } from "./batch";
 import { loadPdfLib, pdfLibToBlob } from "./loader";
+import { pagePercent, stageProgress, type ProgressFn } from "./progress";
 import { loadPdfLibModule, requireBrowser } from "./runtime";
 
 export type OptimizeLevel = "low" | "medium" | "high";
 
-export async function optimizePdf(file: File, level: OptimizeLevel = "medium"): Promise<Blob> {
+export async function optimizePdf(
+  file: File,
+  level: OptimizeLevel = "medium",
+  onProgress?: ProgressFn,
+): Promise<Blob> {
   requireBrowser();
   const { loadPdfjs, renderPageToCanvas } = await import("./loader");
   const pdfjs = await loadPdfjs();
@@ -17,7 +23,10 @@ export async function optimizePdf(file: File, level: OptimizeLevel = "medium"): 
   const scale = scaleMap[level];
   const quality = qualityMap[level];
 
+  onProgress?.(stageProgress("compress", 5, { pageCount: pdf.numPages }));
+
   for (let i = 1; i <= pdf.numPages; i++) {
+    await yieldToMain();
     const { canvas, width, height } = await renderPageToCanvas(pdf, i, scale);
     const jpegBlob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Compress failed"))), "image/jpeg", quality);
@@ -26,8 +35,10 @@ export async function optimizePdf(file: File, level: OptimizeLevel = "medium"): 
     const page = newDoc.addPage([width / scale, height / scale]);
     const img = await newDoc.embedJpg(jpegBytes);
     page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
+    onProgress?.(pagePercent(i, pdf.numPages, { stage: "compress" }));
   }
 
+  onProgress?.(stageProgress("pack", 95));
   return pdfLibToBlob(newDoc);
 }
 
