@@ -1,4 +1,10 @@
-import { isRtlDominant, normalizeArabicText } from "@/lib/pdf/bidi";
+import { normalizeArabicText } from "@/lib/pdf/bidi";
+import {
+  blockRtl,
+  fontFor,
+  layoutToInches,
+  stripHexColor,
+} from "@/lib/pdf/vision/block-layout.server";
 import {
   PORTRAIT_CONTENT_W,
   PORTRAIT_HEIGHT_IN,
@@ -6,11 +12,16 @@ import {
   PORTRAIT_MARGIN_X,
   PORTRAIT_WIDTH_IN,
 } from "@/lib/pdf/vision/layout-constants";
-import type { VisionChart, VisionSlide } from "@/lib/pdf/vision/schema";
+import { legacySlideToBlocks } from "@/lib/pdf/vision/legacy-slide.server";
+import type { VisionBlock, VisionChart, VisionPage, VisionSlide } from "@/lib/pdf/vision/schema";
 
-function rtlFor(text: string, explicit?: boolean): boolean {
-  if (typeof explicit === "boolean") return explicit;
-  return isRtlDominant(text);
+/** STRICT: this module must never embed raster page images — editable native content only. */
+const FORBID_PAGE_IMAGES = true as const;
+
+function assertNoImageEmbed(): void {
+  if (!FORBID_PAGE_IMAGES) {
+    throw new Error("Page image embedding is forbidden in Master Engine PPTX builder");
+  }
 }
 
 function definePortraitLayout(pptx: import("pptxgenjs").default): void {
@@ -22,16 +33,30 @@ function definePortraitLayout(pptx: import("pptxgenjs").default): void {
   pptx.layout = PORTRAIT_LAYOUT_NAME;
 }
 
+function defaultFontSize(block: VisionBlock): number {
+  if (block.fontSize) return block.fontSize;
+  switch (block.type) {
+    case "heading":
+      return block.level === 1 ? 24 : block.level === 2 ? 20 : 16;
+    case "paragraph":
+      return 13;
+    case "list":
+      return 14;
+    default:
+      return 12;
+  }
+}
+
 function addChartToSlide(
   slide: import("pptxgenjs").Slide,
   pptx: import("pptxgenjs").default,
   chart: VisionChart,
-  y: number,
+  box: { x: number; y: number; w: number; h: number },
   rtl: boolean,
-): number {
+): void {
   const categories = chart.categories ?? [];
   const series = chart.series ?? [];
-  if (!categories.length || !series.length) return y;
+  if (!categories.length || !series.length) return;
 
   const chartData = series.map((s) => ({
     name: normalizeArabicText(s.name),
@@ -49,120 +74,204 @@ function addChartToSlide(
   const chartType = typeMap[chart.chartType ?? "bar"] ?? pptx.charts.BAR;
 
   slide.addChart(chartType, chartData, {
-    x: PORTRAIT_MARGIN_X,
-    y,
-    w: PORTRAIT_CONTENT_W,
-    h: 3.5,
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: Math.min(box.h, 3.5),
     showTitle: Boolean(chart.title),
     title: chart.title ? normalizeArabicText(chart.title) : undefined,
     showLegend: series.length > 1,
     legendPos: rtl ? "b" : "b",
   });
-
-  return y + 3.8;
 }
 
-/** Build portrait-oriented editable PPTX from Master Engine slides. */
-export async function buildPptxFromVisionSlides(slides: VisionSlide[]): Promise<Buffer> {
+function renderBlockToSlide(
+  slide: import("pptxgenjs").Slide,
+  pptx: import("pptxgenjs").default,
+  block: VisionBlock,
+  flowY: number,
+): number {
+  assertNoImageEmbed();
+  const rtl = blockRtl(block);
+  const fontFace = fontFor(rtl);
+  const box = layoutToInches(block.layout, flowY);
+  let nextY = box.usedFlowY ? box.y : box.y;
+
+  switch (block.type) {
+    case "shape": {
+      const fill = stripHexColor(block.fillColor);
+      if (fill) {
+        slide.addShape(pptx.ShapeType.rect, {
+          x: box.x,
+          y: box.y,
+          w: box.w,
+          h: box.h,
+          fill: { color: fill },
+          line: { type: "none" },
+        });
+      }
+      const label = block.text ? normalizeArabicText(block.text) : "";
+      if (label) {
+        slide.addText(label, {
+          x: box.x,
+          y: box.y,
+          w: box.w,
+          h: box.h,
+          fontSize: block.fontSize ?? 11,
+          bold: block.bold ?? false,
+          align: rtl ? "right" : "center",
+          valign: "middle",
+          rtlMode: rtl,
+          fontFace,
+        });
+      }
+      nextY = box.y + box.h + 0.12;
+      break;
+    }
+    case "heading": {
+      const text = normalizeArabicText(block.text ?? "");
+      if (!text) break;
+      slide.addText(text, {
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        fontSize: defaultFontSize(block),
+        bold: block.bold ?? true,
+        align: rtl ? "right" : "left",
+        rtlMode: rtl,
+        fontFace,
+      });
+      nextY = box.y + box.h + 0.1;
+      break;
+    }
+    case "paragraph": {
+      const text = normalizeArabicText(block.text ?? "");
+      if (!text) break;
+      slide.addText(text, {
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        fontSize: defaultFontSize(block),
+        bold: block.bold ?? false,
+        align: rtl ? "right" : "left",
+        rtlMode: rtl,
+        fontFace,
+        wrap: true,
+      });
+      nextY = box.y + box.h + 0.08;
+      break;
+    }
+    case "list": {
+      const items = (block.items ?? []).map((b) => normalizeArabicText(b)).filter(Boolean);
+      if (!items.length) break;
+      slide.addText(
+        items.map((b) => ({ text: b, options: { bullet: true } })),
+        {
+          x: box.x + (rtl ? 0 : 0.15),
+          y: box.y,
+          w: box.w - 0.15,
+          h: Math.min(box.h, PORTRAIT_HEIGHT_IN - box.y - 0.5),
+          fontSize: defaultFontSize(block),
+          align: rtl ? "right" : "left",
+          rtlMode: rtl,
+          fontFace,
+        },
+      );
+      nextY = box.y + Math.min(box.h, items.length * 0.35 + 0.2);
+      break;
+    }
+    case "table": {
+      const rows = block.rows ?? [];
+      if (!rows.length) break;
+      slide.addTable(rows.map((row) => row.map((c) => normalizeArabicText(c))), {
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        fontSize: 11,
+        align: rtl ? "right" : "left",
+        rtlMode: rtl,
+      });
+      nextY = box.y + Math.max(box.h, 1.2);
+      break;
+    }
+    case "chart": {
+      addChartToSlide(
+        slide,
+        pptx,
+        {
+          chartType: block.chartType,
+          title: block.title,
+          categories: block.categories,
+          series: block.series,
+        },
+        { x: box.x, y: box.y, w: box.w, h: Math.max(box.h, 3) },
+        rtl,
+      );
+      nextY = box.y + 3.6;
+      break;
+    }
+    default:
+      break;
+  }
+
+  return Math.min(nextY, PORTRAIT_HEIGHT_IN - 0.4);
+}
+
+function pageToBlocks(page: VisionPage): VisionBlock[] {
+  if (page.blocks.length) return page.blocks;
+  return [];
+}
+
+/** Build portrait-oriented editable PPTX from Master Engine page blocks — no raster images. */
+export async function buildPptxFromVisionPages(pages: VisionPage[]): Promise<Buffer> {
+  assertNoImageEmbed();
+
   const pptxModule = await import("pptxgenjs");
   const PptxGenJS = pptxModule.default as typeof import("pptxgenjs").default;
   const pptx = new PptxGenJS();
   definePortraitLayout(pptx);
 
-  for (const slideData of slides) {
+  for (const pageData of pages) {
     const slide = pptx.addSlide();
-    const rtl = slideData.rtl ?? rtlFor(slideData.title ?? slideData.bullets?.[0] ?? "");
-    let y = 0.5;
+    const blocks = pageToBlocks(pageData);
+    let flowY = 0.5;
 
-    if (slideData.title) {
-      slide.addText(normalizeArabicText(slideData.title), {
+    if (pageData.pageTitle) {
+      const rtl = blockRtl({ type: "heading", text: pageData.pageTitle });
+      slide.addText(normalizeArabicText(pageData.pageTitle), {
         x: PORTRAIT_MARGIN_X,
-        y,
+        y: flowY,
         w: PORTRAIT_CONTENT_W,
-        h: 0.7,
-        fontSize: 24,
+        h: 0.65,
+        fontSize: 22,
         bold: true,
         align: rtl ? "right" : "left",
         rtlMode: rtl,
-        fontFace: rtl ? "Traditional Arabic" : "Calibri",
+        fontFace: fontFor(rtl),
       });
-      y += 0.85;
+      flowY += 0.75;
     }
 
-    if (slideData.subtitle) {
-      slide.addText(normalizeArabicText(slideData.subtitle), {
+    for (const block of blocks) {
+      if (flowY >= PORTRAIT_HEIGHT_IN - 0.5) break;
+      flowY = renderBlockToSlide(slide, pptx, block, flowY);
+    }
+
+    if (!blocks.length && !pageData.pageTitle) {
+      slide.addText("PDF Quanta", {
         x: PORTRAIT_MARGIN_X,
-        y,
+        y: 4,
         w: PORTRAIT_CONTENT_W,
-        h: 0.5,
-        fontSize: 16,
-        color: "666666",
-        align: rtl ? "right" : "left",
-        rtlMode: rtl,
-        fontFace: rtl ? "Traditional Arabic" : "Calibri",
+        h: 1,
+        fontSize: 18,
+        align: "center",
       });
-      y += 0.65;
-    }
-
-    const bullets = (slideData.bullets ?? []).map((b) => normalizeArabicText(b)).filter(Boolean);
-    if (bullets.length) {
-      slide.addText(
-        bullets.map((b) => ({ text: b, options: { bullet: true } })),
-        {
-          x: PORTRAIT_MARGIN_X + 0.15,
-          y,
-          w: PORTRAIT_CONTENT_W - 0.15,
-          h: Math.min(4, PORTRAIT_HEIGHT_IN - y - 1),
-          fontSize: 14,
-          align: rtl ? "right" : "left",
-          rtlMode: rtl,
-          fontFace: rtl ? "Traditional Arabic" : "Calibri",
-        },
-      );
-      y += Math.min(3, bullets.length * 0.4);
-    }
-
-    const paragraphs = (slideData.paragraphs ?? []).map((p) => normalizeArabicText(p)).filter(Boolean);
-    for (const para of paragraphs) {
-      if (y > PORTRAIT_HEIGHT_IN - 1.5) break;
-      slide.addText(para, {
-        x: PORTRAIT_MARGIN_X + 0.15,
-        y,
-        w: PORTRAIT_CONTENT_W - 0.15,
-        h: 0.9,
-        fontSize: 13,
-        align: rtl ? "right" : "left",
-        rtlMode: rtl,
-        fontFace: rtl ? "Traditional Arabic" : "Calibri",
-      });
-      y += 0.95;
-    }
-
-    if (slideData.table?.rows?.length && y < PORTRAIT_HEIGHT_IN - 2) {
-      const headers = slideData.table.headers;
-      const bodyRows = slideData.table.rows;
-      const tableRows: string[][] = headers ? [headers, ...bodyRows] : bodyRows;
-      slide.addTable(tableRows, {
-        x: PORTRAIT_MARGIN_X,
-        y: Math.min(y, PORTRAIT_HEIGHT_IN - 2.5),
-        w: PORTRAIT_CONTENT_W,
-        fontSize: 11,
-        align: rtl ? "right" : "left",
-        rtlMode: rtl,
-      });
-      y += 2;
-    }
-
-    if (slideData.chart?.series?.length && y < PORTRAIT_HEIGHT_IN - 4) {
-      y = addChartToSlide(slide, pptx, slideData.chart, y, rtl);
-    }
-
-    if (slideData.notes) {
-      slide.addNotes(normalizeArabicText(slideData.notes));
     }
   }
 
-  if (!slides.length) {
+  if (!pages.length) {
     const slide = pptx.addSlide();
     slide.addText("PDF Quanta", {
       x: PORTRAIT_MARGIN_X,
@@ -175,4 +284,13 @@ export async function buildPptxFromVisionSlides(slides: VisionSlide[]): Promise<
 
   const out = await pptx.write({ outputType: "nodebuffer" });
   return Buffer.from(out as ArrayBuffer);
+}
+
+/** @deprecated Use buildPptxFromVisionPages — slides are converted to blocks internally. */
+export async function buildPptxFromVisionSlides(slides: VisionSlide[]): Promise<Buffer> {
+  const pages: VisionPage[] = slides.map((s) => ({
+    pageNumber: s.slideNumber,
+    blocks: legacySlideToBlocks(s),
+  }));
+  return buildPptxFromVisionPages(pages);
 }

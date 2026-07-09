@@ -1,6 +1,6 @@
 import { buildDocxFromVisionPages } from "@/lib/pdf/vision/build-docx.server";
 import { buildHtmlFromVisionPages } from "@/lib/pdf/vision/build-html.server";
-import { buildPptxFromVisionSlides } from "@/lib/pdf/vision/build-pptx.server";
+import { buildPptxFromVisionPages } from "@/lib/pdf/vision/build-pptx.server";
 import { buildXlsxFromVisionPages } from "@/lib/pdf/vision/build-xlsx.server";
 import { resolveVisionConfig } from "@/lib/pdf/vision/config.server";
 import { OFFICE_EXT, OFFICE_MIME } from "@/lib/pdf/vision/layout-constants";
@@ -9,15 +9,12 @@ import {
   MAX_VISION_PAGES,
   type MasterConvertTool,
   type VisionPage,
-  type VisionSlide,
 } from "@/lib/pdf/vision/schema";
 import {
   assertValidOutput,
   countPageContent,
-  countSlideContent,
   logMaster,
   sanitizePages,
-  sanitizeSlides,
 } from "@/lib/pdf/vision/validate.server";
 import { extractAllPages } from "@/lib/pdf/vision/vision-api.server";
 
@@ -78,6 +75,27 @@ export async function convertPdfWithVision(
 
   onProgress?.({ stage: "validate", percent: 75, pageCount });
 
+  const docPages = sanitizePages(extracted as VisionPage[]);
+  const contentCount = countPageContent(docPages);
+  logMaster("extracted_pages", { tool, pages: docPages.length, blocks: contentCount });
+  if (contentCount === 0) {
+    logMaster("empty_extraction", { tool });
+    throw new MasterEmptyExtractionError();
+  }
+
+  onProgress?.({ stage: "build", percent: 85, pageCount });
+  const baseTitle = fileName.replace(/\.pdf$/i, "") || "Document";
+  const buffer =
+    tool === "pdf-ppt"
+      ? await buildPptxFromVisionPages(docPages)
+      : tool === "pdf-excel"
+        ? await buildXlsxFromVisionPages(docPages)
+        : tool === "pdf-html"
+          ? await buildHtmlFromVisionPages(docPages, baseTitle)
+          : await buildDocxFromVisionPages(docPages);
+
+  assertValidOutput(tool, buffer);
+
   const resultBase = {
     pageCount,
     provider: lastMeta.provider,
@@ -85,38 +103,6 @@ export async function convertPdfWithVision(
     preferredProvider: config.preferredProvider,
     usedProviderFallback: config.keyFallback || lastMeta.usedProviderFallback,
   };
-
-  let buffer: Buffer;
-
-  if (tool === "pdf-ppt") {
-    const slides = sanitizeSlides(extracted as VisionSlide[]);
-    const contentCount = countSlideContent(slides);
-    logMaster("extracted_slides", { tool, slides: slides.length, contentCount });
-    if (contentCount === 0) {
-      logMaster("empty_extraction", { tool });
-      throw new MasterEmptyExtractionError();
-    }
-    onProgress?.({ stage: "build", percent: 85, pageCount });
-    buffer = await buildPptxFromVisionSlides(slides);
-  } else {
-    const docPages = sanitizePages(extracted as VisionPage[]);
-    const contentCount = countPageContent(docPages);
-    logMaster("extracted_pages", { tool, pages: docPages.length, blocks: contentCount });
-    if (contentCount === 0) {
-      logMaster("empty_extraction", { tool });
-      throw new MasterEmptyExtractionError();
-    }
-    onProgress?.({ stage: "build", percent: 85, pageCount });
-    const baseTitle = fileName.replace(/\.pdf$/i, "") || "Document";
-    buffer =
-      tool === "pdf-excel"
-        ? await buildXlsxFromVisionPages(docPages)
-        : tool === "pdf-html"
-          ? await buildHtmlFromVisionPages(docPages, baseTitle)
-          : await buildDocxFromVisionPages(docPages);
-  }
-
-  assertValidOutput(tool, buffer);
 
   logMaster("complete", {
     tool,

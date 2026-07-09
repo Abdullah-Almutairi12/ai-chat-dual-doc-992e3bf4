@@ -1,3 +1,4 @@
+import { stripForbiddenImageBlocks, stripHexColor } from "@/lib/pdf/vision/block-layout.server";
 import type { VisionBlock, VisionPage, VisionSlide } from "@/lib/pdf/vision/schema";
 
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04] as const;
@@ -33,13 +34,17 @@ export function sanitizeBlock(block: VisionBlock): VisionBlock {
       }))
       .filter((s) => s.name.length > 0);
   }
+  if (base.fillColor) {
+    base.fillColor = stripHexColor(base.fillColor) ?? undefined;
+  }
   return base;
 }
 
 export function sanitizePages(pages: VisionPage[]): VisionPage[] {
   return pages.map((p) => ({
     ...p,
-    blocks: p.blocks.map(sanitizeBlock).filter((b) => blockHasContent(b)),
+    pageTitle: p.pageTitle ? sanitizeText(p.pageTitle) : undefined,
+    blocks: stripForbiddenImageBlocks(p.blocks.map(sanitizeBlock)).filter((b) => blockHasContent(b)),
   }));
 }
 
@@ -72,6 +77,9 @@ export function sanitizeSlides(slides: VisionSlide[]): VisionSlide[] {
 }
 
 function blockHasContent(block: VisionBlock): boolean {
+  if (block.type === "shape") {
+    return Boolean(stripHexColor(block.fillColor) || block.text?.trim());
+  }
   if (block.text?.trim()) return true;
   if (block.items?.length) return true;
   if (block.rows?.length) return true;

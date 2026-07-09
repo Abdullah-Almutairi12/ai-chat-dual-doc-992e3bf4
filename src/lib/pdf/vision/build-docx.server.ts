@@ -1,9 +1,14 @@
-import { isRtlDominant, normalizeArabicText } from "@/lib/pdf/bidi";
+import { normalizeArabicText } from "@/lib/pdf/bidi";
+import { blockRtl, fontFor, stripHexColor } from "@/lib/pdf/vision/block-layout.server";
 import type { VisionBlock, VisionChart, VisionPage } from "@/lib/pdf/vision/schema";
 
-function rtlFor(text: string, explicit?: boolean): boolean {
-  if (typeof explicit === "boolean") return explicit;
-  return isRtlDominant(text);
+/** STRICT: this module must never embed raster page images — editable native content only. */
+const FORBID_PAGE_IMAGES = true as const;
+
+function assertNoImageEmbed(): void {
+  if (!FORBID_PAGE_IMAGES) {
+    throw new Error("Page image embedding is forbidden in Master Engine DOCX builder");
+  }
 }
 
 function chartToTableRows(chart: VisionChart): string[][] {
@@ -20,8 +25,24 @@ function chartToTableRows(chart: VisionChart): string[][] {
   return rows;
 }
 
-/** Build portrait-oriented editable DOCX from Master Engine pages. */
+function defaultFontSize(block: VisionBlock): number {
+  if (block.fontSize) return block.fontSize * 2;
+  switch (block.type) {
+    case "heading":
+      return block.level === 1 ? 32 : block.level === 2 ? 28 : 24;
+    case "paragraph":
+      return 22;
+    case "list":
+      return 22;
+    default:
+      return 20;
+  }
+}
+
+/** Build portrait-oriented editable DOCX from Master Engine blocks — no raster images. */
 export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buffer> {
+  assertNoImageEmbed();
+
   const {
     Document,
     Packer,
@@ -35,6 +56,7 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
     TableCell,
     WidthType,
     PageOrientation,
+    ShadingType,
   } = await import("docx");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,10 +64,21 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
 
   for (let i = 0; i < pages.length; i++) {
     if (pages[i].pageTitle) {
+      const title = normalizeArabicText(pages[i].pageTitle!);
+      const rtl = blockRtl({ type: "heading", text: title });
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: normalizeArabicText(pages[i].pageTitle!) })],
+          alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
+          bidirectional: rtl,
+          children: [
+            new TextRun({
+              text: title,
+              rightToLeft: rtl,
+              font: fontFor(rtl),
+              bold: true,
+            }),
+          ],
         }),
       );
     }
@@ -60,6 +93,7 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
           TableRow,
           TableCell,
           WidthType,
+          ShadingType,
         }),
       );
     }
@@ -96,11 +130,21 @@ function blockToDocxElements(
   block: VisionBlock,
   docx: Pick<
     typeof import("docx"),
-    "Paragraph" | "TextRun" | "AlignmentType" | "HeadingLevel" | "Table" | "TableRow" | "TableCell" | "WidthType"
+    | "Paragraph"
+    | "TextRun"
+    | "AlignmentType"
+    | "HeadingLevel"
+    | "Table"
+    | "TableRow"
+    | "TableCell"
+    | "WidthType"
+    | "ShadingType"
   >,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any[] {
-  const { Paragraph, TextRun, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType } = docx;
+  assertNoImageEmbed();
+  const { Paragraph, TextRun, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType, ShadingType } =
+    docx;
 
   if (block.type === "chart") {
     const rows = chartToTableRows(block);
@@ -109,10 +153,36 @@ function blockToDocxElements(
   }
 
   switch (block.type) {
+    case "shape": {
+      const fill = stripHexColor(block.fillColor);
+      const label = block.text ? normalizeArabicText(block.text) : " ";
+      const rtl = blockRtl(block);
+      const sizeHalfPoints = defaultFontSize(block);
+      return [
+        new Paragraph({
+          alignment: rtl ? AlignmentType.RIGHT : AlignmentType.CENTER,
+          bidirectional: rtl,
+          spacing: { before: 80, after: 80 },
+          shading: fill
+            ? { fill, type: ShadingType.CLEAR, color: "auto" }
+            : undefined,
+          indent: block.layout?.x != null ? { left: Math.round(block.layout.x * 7200) } : undefined,
+          children: [
+            new TextRun({
+              text: label,
+              rightToLeft: rtl,
+              font: fontFor(rtl),
+              size: sizeHalfPoints,
+              bold: block.bold ?? false,
+            }),
+          ],
+        }),
+      ];
+    }
     case "heading": {
       const text = normalizeArabicText(block.text ?? "");
       if (!text) return [];
-      const rtl = rtlFor(text, block.rtl);
+      const rtl = blockRtl(block);
       const level = block.level ?? 1;
       const heading =
         level === 1 ? HeadingLevel.HEADING_1 : level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
@@ -120,12 +190,14 @@ function blockToDocxElements(
         new Paragraph({
           heading,
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
+          bidirectional: rtl,
           children: [
             new TextRun({
               text,
               rightToLeft: rtl,
-              font: rtl ? "Traditional Arabic" : "Calibri",
-              bold: true,
+              font: fontFor(rtl),
+              bold: block.bold ?? true,
+              size: defaultFontSize(block),
             }),
           ],
         }),
@@ -134,15 +206,18 @@ function blockToDocxElements(
     case "paragraph": {
       const text = normalizeArabicText(block.text ?? "");
       if (!text) return [];
-      const rtl = rtlFor(text, block.rtl);
+      const rtl = blockRtl(block);
       return [
         new Paragraph({
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
+          bidirectional: rtl,
           children: [
             new TextRun({
               text,
               rightToLeft: rtl,
-              font: rtl ? "Traditional Arabic" : "Calibri",
+              font: fontFor(rtl),
+              size: defaultFontSize(block),
+              bold: block.bold ?? false,
             }),
           ],
         }),
@@ -152,14 +227,16 @@ function blockToDocxElements(
       const items = (block.items ?? []).map((item) => normalizeArabicText(item)).filter(Boolean);
       if (!items.length) return [];
       return items.map((item) => {
-        const rtl = rtlFor(item, block.rtl);
+        const rtl = blockRtl({ ...block, text: item });
         return new Paragraph({
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
+          bidirectional: rtl,
           children: [
             new TextRun({
               text: `• ${item}`,
               rightToLeft: rtl,
-              font: rtl ? "Traditional Arabic" : "Calibri",
+              font: fontFor(rtl),
+              size: defaultFontSize(block),
             }),
           ],
         });
@@ -171,23 +248,26 @@ function blockToDocxElements(
       const tableRows = rows.map(
         (row) =>
           new TableRow({
-            children: row.map(
-              (cell) =>
-                new TableCell({
-                  width: { size: 100 / Math.max(row.length, 1), type: WidthType.PERCENTAGE },
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: normalizeArabicText(cell),
-                          rightToLeft: rtlFor(cell, block.rtl),
-                          font: rtlFor(cell, block.rtl) ? "Traditional Arabic" : "Calibri",
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-            ),
+            children: row.map((cell) => {
+              const text = normalizeArabicText(cell);
+              const rtl = blockRtl({ ...block, text: cell });
+              return new TableCell({
+                width: { size: 100 / Math.max(row.length, 1), type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
+                    bidirectional: rtl,
+                    children: [
+                      new TextRun({
+                        text,
+                        rightToLeft: rtl,
+                        font: fontFor(rtl),
+                      }),
+                    ],
+                  }),
+                ],
+              });
+            }),
           }),
       );
       return [new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } })];

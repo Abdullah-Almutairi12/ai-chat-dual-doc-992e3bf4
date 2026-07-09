@@ -13,31 +13,34 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PaymentMockRouteImport } from './routes/payment.mock'
 import { Route as PaymentCallbackRouteImport } from './routes/payment.callback'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AppToolsRouteImport } from './routes/_app.tools'
 import { Route as AppTablesRouteImport } from './routes/_app.tables'
 import { Route as AppQuizRouteImport } from './routes/_app.quiz'
 import { Route as AppProofreaderRouteImport } from './routes/_app.proofreader'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAnalyzerRouteImport } from './routes/_app.analyzer'
-import { Route as AppToolsRouteImport } from './routes/_app.tools'
-import { Route as AppToolsToolIdRouteImport } from './routes/_app.tools.$toolId'
-import { Route as AppToolsIndexRouteImport } from './routes/_app.tools.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AppToolsIndexRouteImport } from './routes/_app.tools.index'
 import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap-webhook'
-import { Route as ApiPublicBillingHealthRouteImport } from './routes/api/public/billing-health'
 import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
 import { Route as ApiPublicSendWelcomeRouteImport } from './routes/api/public/send-welcome'
+import { Route as ApiPublicBillingHealthRouteImport } from './routes/api/public/billing-health'
+import { Route as ApiPdfUploadRouteImport } from './routes/api/pdf/upload'
+import { Route as ApiPdfConvertVisionRouteImport } from './routes/api/pdf/convert-vision'
+import { Route as ApiPdfConsumeRouteImport } from './routes/api/pdf/consume'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminFinancialsRouteImport } from './routes/_authenticated/admin.financials'
 import { Route as AuthenticatedAdminDocumentsRouteImport } from './routes/_authenticated/admin.documents'
+import { Route as AppToolsToolIdRouteImport } from './routes/_app.tools.$toolId'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -57,11 +60,6 @@ const PricingRoute = PricingRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -87,10 +85,20 @@ const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
   path: '/payment/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AppToolsRoute = AppToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppTablesRoute = AppTablesRouteImport.update({
   id: '/tables',
@@ -122,34 +130,19 @@ const AppAnalyzerRoute = AppAnalyzerRouteImport.update({
   path: '/analyzer',
   getParentRoute: () => AppRoute,
 } as any)
-const AppToolsRoute = AppToolsRouteImport.update({
-  id: '/tools',
-  path: '/tools',
-  getParentRoute: () => AppRoute,
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
 const AppToolsIndexRoute = AppToolsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppToolsRoute,
 } as any)
-const AppToolsToolIdRoute = AppToolsToolIdRouteImport.update({
-  id: '/$toolId',
-  path: '/$toolId',
-  getParentRoute: () => AppToolsRoute,
-} as any)
-const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
 const ApiPublicTapWebhookRoute = ApiPublicTapWebhookRouteImport.update({
   id: '/api/public/tap-webhook',
   path: '/api/public/tap-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicBillingHealthRoute = ApiPublicBillingHealthRouteImport.update({
-  id: '/api/public/billing-health',
-  path: '/api/public/billing-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTapRenewRoute = ApiPublicTapRenewRouteImport.update({
@@ -160,6 +153,26 @@ const ApiPublicTapRenewRoute = ApiPublicTapRenewRouteImport.update({
 const ApiPublicSendWelcomeRoute = ApiPublicSendWelcomeRouteImport.update({
   id: '/api/public/send-welcome',
   path: '/api/public/send-welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBillingHealthRoute = ApiPublicBillingHealthRouteImport.update({
+  id: '/api/public/billing-health',
+  path: '/api/public/billing-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPdfUploadRoute = ApiPdfUploadRouteImport.update({
+  id: '/api/pdf/upload',
+  path: '/api/pdf/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPdfConvertVisionRoute = ApiPdfConvertVisionRouteImport.update({
+  id: '/api/pdf/convert-vision',
+  path: '/api/pdf/convert-vision',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPdfConsumeRoute = ApiPdfConsumeRouteImport.update({
+  id: '/api/pdf/consume',
+  path: '/api/pdf/consume',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
@@ -185,11 +198,15 @@ const AuthenticatedAdminDocumentsRoute =
     path: '/documents',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AppToolsToolIdRoute = AppToolsToolIdRouteImport.update({
+  id: '/$toolId',
+  path: '/$toolId',
+  getParentRoute: () => AppToolsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/pricing': typeof PricingRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -200,25 +217,28 @@ export interface FileRoutesByFullPath {
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
   '/tools': typeof AppToolsRouteWithChildren
-  '/tools/': typeof AppToolsIndexRoute
-  '/tools/$toolId': typeof AppToolsToolIdRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
+  '/tools/$toolId': typeof AppToolsToolIdRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/pdf/consume': typeof ApiPdfConsumeRoute
+  '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
+  '/api/pdf/upload': typeof ApiPdfUploadRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
+  '/tools/': typeof AppToolsIndexRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/pricing': typeof PricingRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -228,19 +248,22 @@ export interface FileRoutesByTo {
   '/proofreader': typeof AppProofreaderRoute
   '/quiz': typeof AppQuizRoute
   '/tables': typeof AppTablesRoute
-  '/tools': typeof AppToolsIndexRoute
-  '/tools/': typeof AppToolsIndexRoute
-  '/tools/$toolId': typeof AppToolsToolIdRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
+  '/tools/$toolId': typeof AppToolsToolIdRoute
   '/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/pdf/consume': typeof ApiPdfConsumeRoute
+  '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
+  '/api/pdf/upload': typeof ApiPdfUploadRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
+  '/tools': typeof AppToolsIndexRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -249,7 +272,6 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/pricing': typeof PricingRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -260,19 +282,23 @@ export interface FileRoutesById {
   '/_app/quiz': typeof AppQuizRoute
   '/_app/tables': typeof AppTablesRoute
   '/_app/tools': typeof AppToolsRouteWithChildren
-  '/_app/tools/': typeof AppToolsIndexRoute
-  '/_app/tools/$toolId': typeof AppToolsToolIdRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/auth/callback': typeof AuthCallbackRoute
   '/payment/callback': typeof PaymentCallbackRoute
   '/payment/mock': typeof PaymentMockRoute
+  '/_app/tools/$toolId': typeof AppToolsToolIdRoute
   '/_authenticated/admin/documents': typeof AuthenticatedAdminDocumentsRoute
   '/_authenticated/admin/financials': typeof AuthenticatedAdminFinancialsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/pdf/consume': typeof ApiPdfConsumeRoute
+  '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
+  '/api/pdf/upload': typeof ApiPdfUploadRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
   '/api/public/tap-webhook': typeof ApiPublicTapWebhookRoute
+  '/_app/tools/': typeof AppToolsIndexRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -280,7 +306,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
-    | '/auth/callback'
     | '/pricing'
     | '/signup'
     | '/sitemap.xml'
@@ -291,25 +316,28 @@ export interface FileRouteTypes {
     | '/quiz'
     | '/tables'
     | '/tools'
-    | '/tools/'
-    | '/tools/$toolId'
     | '/admin'
+    | '/auth/callback'
     | '/payment/callback'
     | '/payment/mock'
+    | '/tools/$toolId'
     | '/admin/documents'
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/pdf/consume'
+    | '/api/pdf/convert-vision'
+    | '/api/pdf/upload'
     | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
+    | '/tools/'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/auth/callback'
     | '/pricing'
     | '/signup'
     | '/sitemap.xml'
@@ -319,19 +347,22 @@ export interface FileRouteTypes {
     | '/proofreader'
     | '/quiz'
     | '/tables'
-    | '/tools'
-    | '/tools/'
-    | '/tools/$toolId'
+    | '/auth/callback'
     | '/payment/callback'
     | '/payment/mock'
+    | '/tools/$toolId'
     | '/admin/documents'
     | '/admin/financials'
     | '/admin/settings'
     | '/admin/users'
+    | '/api/pdf/consume'
+    | '/api/pdf/convert-vision'
+    | '/api/pdf/upload'
     | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
+    | '/tools'
     | '/admin'
   id:
     | '__root__'
@@ -339,7 +370,6 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_app'
     | '/login'
-    | '/auth/callback'
     | '/pricing'
     | '/signup'
     | '/sitemap.xml'
@@ -350,18 +380,23 @@ export interface FileRouteTypes {
     | '/_app/quiz'
     | '/_app/tables'
     | '/_app/tools'
-    | '/_app/tools/$toolId'
     | '/_authenticated/admin'
+    | '/auth/callback'
     | '/payment/callback'
     | '/payment/mock'
+    | '/_app/tools/$toolId'
     | '/_authenticated/admin/documents'
     | '/_authenticated/admin/financials'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
+    | '/api/pdf/consume'
+    | '/api/pdf/convert-vision'
+    | '/api/pdf/upload'
     | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
     | '/api/public/tap-webhook'
+    | '/_app/tools/'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -370,12 +405,15 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
   PricingRoute: typeof PricingRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   PaymentCallbackRoute: typeof PaymentCallbackRoute
   PaymentMockRoute: typeof PaymentMockRoute
+  ApiPdfConsumeRoute: typeof ApiPdfConsumeRoute
+  ApiPdfConvertVisionRoute: typeof ApiPdfConvertVisionRoute
+  ApiPdfUploadRoute: typeof ApiPdfUploadRoute
   ApiPublicBillingHealthRoute: typeof ApiPublicBillingHealthRoute
   ApiPublicSendWelcomeRoute: typeof ApiPublicSendWelcomeRoute
   ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
@@ -410,13 +448,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -454,12 +485,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_app/tools': {
+      id: '/_app/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof AppToolsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/tables': {
       id: '/_app/tables'
@@ -503,27 +548,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyzerRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/tools': {
-      id: '/_app/tools'
-      path: '/tools'
-      fullPath: '/tools'
-      preLoaderRoute: typeof AppToolsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/tools/$toolId': {
-      id: '/_app/tools/$toolId'
-      path: '/$toolId'
-      fullPath: '/tools/$toolId'
-      preLoaderRoute: typeof AppToolsToolIdRouteImport
-      parentRoute: typeof AppToolsRoute
-    }
-    '/_app/tools/': {
-      id: '/_app/tools/'
-      path: '/'
-      fullPath: '/tools/'
-      preLoaderRoute: typeof AppToolsIndexRouteImport
-      parentRoute: typeof AppToolsRoute
-    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
@@ -531,12 +555,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/api/public/billing-health': {
-      id: '/api/public/billing-health'
-      path: '/api/public/billing-health'
-      fullPath: '/api/public/billing-health'
-      preLoaderRoute: typeof ApiPublicBillingHealthRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/tools/': {
+      id: '/_app/tools/'
+      path: '/'
+      fullPath: '/tools/'
+      preLoaderRoute: typeof AppToolsIndexRouteImport
+      parentRoute: typeof AppToolsRoute
     }
     '/api/public/tap-webhook': {
       id: '/api/public/tap-webhook'
@@ -557,6 +581,34 @@ declare module '@tanstack/react-router' {
       path: '/api/public/send-welcome'
       fullPath: '/api/public/send-welcome'
       preLoaderRoute: typeof ApiPublicSendWelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/billing-health': {
+      id: '/api/public/billing-health'
+      path: '/api/public/billing-health'
+      fullPath: '/api/public/billing-health'
+      preLoaderRoute: typeof ApiPublicBillingHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pdf/upload': {
+      id: '/api/pdf/upload'
+      path: '/api/pdf/upload'
+      fullPath: '/api/pdf/upload'
+      preLoaderRoute: typeof ApiPdfUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pdf/convert-vision': {
+      id: '/api/pdf/convert-vision'
+      path: '/api/pdf/convert-vision'
+      fullPath: '/api/pdf/convert-vision'
+      preLoaderRoute: typeof ApiPdfConvertVisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pdf/consume': {
+      id: '/api/pdf/consume'
+      path: '/api/pdf/consume'
+      fullPath: '/api/pdf/consume'
+      preLoaderRoute: typeof ApiPdfConsumeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/users': {
@@ -586,6 +638,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/documents'
       preLoaderRoute: typeof AuthenticatedAdminDocumentsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_app/tools/$toolId': {
+      id: '/_app/tools/$toolId'
+      path: '/$toolId'
+      fullPath: '/tools/$toolId'
+      preLoaderRoute: typeof AppToolsToolIdRouteImport
+      parentRoute: typeof AppToolsRoute
     }
   }
 }
@@ -621,16 +680,18 @@ const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface AppToolsRouteChildren {
-  AppToolsIndexRoute: typeof AppToolsIndexRoute
   AppToolsToolIdRoute: typeof AppToolsToolIdRoute
+  AppToolsIndexRoute: typeof AppToolsIndexRoute
 }
 
 const AppToolsRouteChildren: AppToolsRouteChildren = {
-  AppToolsIndexRoute: AppToolsIndexRoute,
   AppToolsToolIdRoute: AppToolsToolIdRoute,
+  AppToolsIndexRoute: AppToolsIndexRoute,
 }
 
-const AppToolsRouteWithChildren = AppToolsRoute._addFileChildren(AppToolsRouteChildren)
+const AppToolsRouteWithChildren = AppToolsRoute._addFileChildren(
+  AppToolsRouteChildren,
+)
 
 interface AppRouteChildren {
   AppAnalyzerRoute: typeof AppAnalyzerRoute
@@ -659,12 +720,16 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
-  AuthCallbackRoute: AuthCallbackRoute,
   PricingRoute: PricingRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   PaymentCallbackRoute: PaymentCallbackRoute,
   PaymentMockRoute: PaymentMockRoute,
+  ApiPdfConsumeRoute: ApiPdfConsumeRoute,
+  ApiPdfConvertVisionRoute: ApiPdfConvertVisionRoute,
+  ApiPdfUploadRoute: ApiPdfUploadRoute,
+  ApiPublicBillingHealthRoute: ApiPublicBillingHealthRoute,
   ApiPublicSendWelcomeRoute: ApiPublicSendWelcomeRoute,
   ApiPublicTapRenewRoute: ApiPublicTapRenewRoute,
   ApiPublicTapWebhookRoute: ApiPublicTapWebhookRoute,
@@ -672,3 +737,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

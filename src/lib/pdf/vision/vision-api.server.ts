@@ -5,13 +5,13 @@ import {
   type VisionConfig,
   type VisionProvider,
 } from "@/lib/pdf/vision/config.server";
+import { legacySlideToBlocks } from "@/lib/pdf/vision/legacy-slide.server";
 import { masterPageUserPrompt, masterSystemPromptForTool } from "@/lib/pdf/vision/master-prompts.server";
 import type { MasterConvertTool } from "@/lib/pdf/vision/schema";
 import {
   VisionPageSchema,
   VisionSlideSchema,
   type VisionPage,
-  type VisionSlide,
 } from "@/lib/pdf/vision/schema";
 import { logMaster } from "@/lib/pdf/vision/validate.server";
 
@@ -184,6 +184,33 @@ async function extractPageContent(
   );
 }
 
+/** Parse AI JSON into VisionPage — accepts blocks format or legacy slide format. */
+function parseVisionPage(parsed: unknown, pageNumber: number, tool: MasterConvertTool): VisionPage {
+  const pageResult = VisionPageSchema.safeParse(parsed);
+  if (pageResult.success) {
+    return { ...pageResult.data, pageNumber };
+  }
+
+  if (tool === "pdf-ppt") {
+    const slideResult = VisionSlideSchema.safeParse(parsed);
+    if (slideResult.success) {
+      const slide = slideResult.data;
+      return {
+        pageNumber,
+        pageTitle: slide.title,
+        blocks: legacySlideToBlocks({ ...slide, slideNumber: pageNumber }),
+      };
+    }
+  }
+
+  logMaster("schema_reject_page", {
+    tool,
+    pageNumber,
+    issues: pageResult.error.flatten(),
+  });
+  return { pageNumber, blocks: [] };
+}
+
 export async function extractWordPage(
   config: VisionConfig,
   tool: MasterConvertTool,
@@ -193,57 +220,20 @@ export async function extractWordPage(
 ): Promise<{ page: VisionPage; meta: VisionCallMeta }> {
   const { content, meta } = await extractPageContent(config, tool, pageNumber, pageCount, imageBase64);
   const parsed = parseJson<unknown>(content);
-  const result = VisionPageSchema.safeParse(parsed);
-  if (!result.success) {
-    logMaster("schema_reject_page", { tool, pageNumber, issues: result.error.flatten() });
-    return { page: { pageNumber, blocks: [] }, meta };
-  }
-  return { page: { ...result.data, pageNumber }, meta };
-}
-
-export async function extractSlidePage(
-  config: VisionConfig,
-  pageNumber: number,
-  pageCount: number,
-  imageBase64: string,
-): Promise<{ slide: VisionSlide; meta: VisionCallMeta }> {
-  const { content, meta } = await extractPageContent(
-    config,
-    "pdf-ppt",
-    pageNumber,
-    pageCount,
-    imageBase64,
-  );
-  const parsed = parseJson<unknown>(content);
-  const result = VisionSlideSchema.safeParse(parsed);
-  if (!result.success) {
-    logMaster("schema_reject_slide", { pageNumber, issues: result.error.flatten() });
-    return { slide: { slideNumber: pageNumber }, meta };
-  }
-  return { slide: { ...result.data, slideNumber: pageNumber }, meta };
+  return { page: parseVisionPage(parsed, pageNumber, tool), meta };
 }
 
 export async function extractAllPages(
   config: VisionConfig,
   tool: MasterConvertTool,
   pages: { pageNumber: number; base64: string }[],
-): Promise<{ data: VisionPage[] | VisionSlide[]; lastMeta: VisionCallMeta }> {
+): Promise<{ data: VisionPage[]; lastMeta: VisionCallMeta }> {
   const pageCount = pages.length;
   let lastMeta: VisionCallMeta = {
     provider: config.provider,
     model: modelForProvider(config, config.provider),
     usedProviderFallback: false,
   };
-
-  if (tool === "pdf-ppt") {
-    const results: VisionSlide[] = [];
-    for (const page of pages) {
-      const { slide, meta } = await extractSlidePage(config, page.pageNumber, pageCount, page.base64);
-      results.push(slide);
-      lastMeta = meta;
-    }
-    return { data: results, lastMeta };
-  }
 
   const results: VisionPage[] = [];
   for (const page of pages) {

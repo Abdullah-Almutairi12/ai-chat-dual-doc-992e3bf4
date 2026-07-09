@@ -16,11 +16,13 @@ Core capabilities:
 Output rules:
 - Return ONLY valid JSON — no markdown fences, no commentary
 - Never describe images — extract editable document content only
+- NEVER return page screenshots, background images, or image blocks — every word must be native editable text
+- Color swatches and design blocks → type "shape" with fillColor hex and optional layout coordinates
 - Omit empty fields and empty blocks
 - Sanitize text: no null bytes, no control characters except newlines in paragraphs`;
 
 export const MASTER_BLOCK_SCHEMA = `{
-  "type": "heading" | "paragraph" | "list" | "table" | "chart",
+  "type": "heading" | "paragraph" | "list" | "table" | "chart" | "shape",
   "level": 1-6 (headings only),
   "rtl": true/false,
   "text": "string",
@@ -29,7 +31,11 @@ export const MASTER_BLOCK_SCHEMA = `{
   "chartType": "bar" | "line" | "pie" | "column",
   "title": "chart title",
   "categories": ["cat1","cat2"],
-  "series": [{ "name": "Series 1", "values": [1,2,3] }]
+  "series": [{ "name": "Series 1", "values": [1,2,3] }],
+  "fillColor": "#RRGGBB (native colored rectangles / swatches — never rasterize)",
+  "layout": { "x": 0-1, "y": 0-1, "w": 0-1, "h": 0-1 } (optional normalized position),
+  "fontSize": number (optional),
+  "bold": true/false (optional)
 }`;
 
 export const MASTER_WORD_PAGE_PROMPT = `${MASTER_ENGINE_IDENTITY}
@@ -44,8 +50,10 @@ Return JSON:
 
 Additional rules:
 - Preserve top-to-bottom reading order
+- Every visible text string (Arabic or English) must appear in a heading/paragraph/list/table block — never omit text
 - Tables: include header row when visible
 - Charts: extract all axis labels and numeric values into series arrays
+- Colored rectangles/swatches: type "shape" with fillColor and layout box
 - Set rtl:true for predominantly Arabic blocks`;
 
 export const MASTER_PPT_PAGE_PROMPT = `${MASTER_ENGINE_IDENTITY}
@@ -54,20 +62,19 @@ Task: Extract slide content for an editable PowerPoint (PPTX) in PORTRAIT orient
 
 Return JSON:
 {
-  "slideNumber": <number>,
-  "title": "main title",
-  "subtitle": "optional subtitle",
-  "bullets": ["bullet points"],
-  "paragraphs": ["body text"],
-  "table": { "headers": ["h1","h2"], "rows": [["a","b"]] },
-  "chart": { "chartType": "bar"|"line"|"pie"|"column", "title": "...", "categories": [], "series": [{ "name": "...", "values": [] }] },
-  "rtl": true/false,
-  "notes": "speaker notes if visible"
+  "pageNumber": <number>,
+  "pageTitle": "optional slide title",
+  "blocks": [ ${MASTER_BLOCK_SCHEMA} ]
 }
 
 Additional rules:
-- Hierarchy: title → subtitle → bullets → paragraphs → table → chart
-- Charts must include editable data series, not image descriptions`;
+- Use the SAME blocks array format as Word — every text element is a native editable block
+- Hierarchy via block order: headings → paragraphs → lists → tables → charts → shapes
+- Include layout {x,y,w,h} when positions are visually distinct (0–1 fractions of page size)
+- Color swatches / design tiles → type "shape" with fillColor (#RRGGBB), never flatten to an image
+- Arabic titles like "حاسبة AI" and "منصة تخطيط موارد المؤسسات" must be paragraph or heading blocks with rtl:true
+- Charts must include editable data series, not image descriptions
+- NEVER suggest embedding the page as a background image`;
 
 export const MASTER_EXCEL_PAGE_PROMPT = `${MASTER_ENGINE_IDENTITY}
 

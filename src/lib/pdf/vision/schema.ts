@@ -15,9 +15,17 @@ export const VisionChartSchema = z.object({
     .optional(),
 });
 
+/** Normalized bounding box (0–1 fractions of page width/height). */
+export const VisionLayoutSchema = z.object({
+  x: z.number().min(0).max(1).optional(),
+  y: z.number().min(0).max(1).optional(),
+  w: z.number().min(0).max(1).optional(),
+  h: z.number().min(0).max(1).optional(),
+});
+
 /** Structured block extracted by Vision AI from a single PDF page. */
 export const VisionBlockSchema = z.object({
-  type: z.enum(["heading", "paragraph", "list", "table", "chart"]),
+  type: z.enum(["heading", "paragraph", "list", "table", "chart", "shape"]),
   level: z.number().int().min(1).max(6).optional(),
   rtl: z.boolean().optional(),
   text: z.string().optional(),
@@ -27,6 +35,11 @@ export const VisionBlockSchema = z.object({
   title: z.string().optional(),
   categories: z.array(z.string()).optional(),
   series: VisionChartSchema.shape.series,
+  /** Hex fill for native rectangle shapes (#RRGGBB or RRGGBB). */
+  fillColor: z.string().optional(),
+  layout: VisionLayoutSchema.optional(),
+  fontSize: z.number().min(6).max(96).optional(),
+  bold: z.boolean().optional(),
 });
 
 export const VisionPageSchema = z.object({
@@ -63,6 +76,7 @@ export const VisionPresentationSchema = z.object({
 });
 
 export type VisionChart = z.infer<typeof VisionChartSchema>;
+export type VisionLayout = z.infer<typeof VisionLayoutSchema>;
 export type VisionBlock = z.infer<typeof VisionBlockSchema>;
 export type VisionPage = z.infer<typeof VisionPageSchema>;
 export type VisionDocument = z.infer<typeof VisionDocumentSchema>;

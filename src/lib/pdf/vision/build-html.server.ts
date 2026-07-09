@@ -52,6 +52,12 @@ function blockToHtml(block: VisionBlock): string {
         .join("");
       return `<table class="chart-data"${dir}>${title}${header}${body}</table>`;
     }
+    case "shape": {
+      const fill = (block.fillColor ?? "").replace(/^#/, "");
+      const label = escapeHtml(normalizeArabicText(block.text ?? ""));
+      const style = fill ? `background:#${fill};padding:8px;min-height:24px;` : "padding:8px;";
+      return label ? `<div class="shape"${dir} style="${style}">${label}</div>` : `<div class="shape" style="${style}">&nbsp;</div>`;
+    }
     default:
       return "";
   }

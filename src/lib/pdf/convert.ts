@@ -54,7 +54,7 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
             new TextRun({
               text,
               rightToLeft: rtl,
-              font: rtl ? "Traditional Arabic" : "Calibri",
+              font: rtl ? "Arial" : "Calibri",
             }),
           ],
         }),
@@ -122,32 +122,71 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
   return new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
-/** PDF → PowerPoint (one slide per page — portrait, local OCR fallback path). */
+/** PDF → PowerPoint (one slide per page — portrait, editable text via layout OCR). */
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
+  const { extractLayout } = await import("@/lib/pdf-layout");
   const pptxModule = await loadPptxModule();
   const PptxGenJS = pptxModule.default as typeof import("pptxgenjs").default;
-  onProgress?.({ stage: "render", percent: 5 });
-  const pdfjs = await loadPdfjs();
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+
+  onProgress?.({ stage: "layout", percent: 5 });
+  const layout = await extractLayout(file, (p) =>
+    onProgress?.({
+      stage: p.stage,
+      percent: 5 + Math.round(p.percent * 0.85),
+      page: p.page,
+      pageCount: p.pageCount,
+    }),
+  );
+
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "PDFQUANTA_PORTRAIT", width: 8.5, height: 11 });
   pptx.layout = "PDFQUANTA_PORTRAIT";
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const { canvas } = await renderPageToCanvas(pdf, i, 1.5);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  for (let i = 0; i < layout.pages.length; i++) {
+    const page = layout.pages[i];
     const slide = pptx.addSlide();
-    slide.addImage({ data: dataUrl, x: 0, y: 0, w: "100%", h: "100%" });
-    onProgress?.({
-      stage: "render",
-      percent: 5 + Math.round((i / pdf.numPages) * 90),
-      page: i,
-      pageCount: pdf.numPages,
-    });
+    const lines = groupIntoLines(
+      page.boxes.map((b) => ({
+        text: b.text,
+        left: b.left,
+        top: b.top,
+        width: b.width,
+        height: b.height,
+      })),
+    );
+    let y = 0.5;
+    for (const line of lines) {
+      if (y > 10) break;
+      const text = normalizeArabicText(joinLineItems(line));
+      if (!text) continue;
+      const rtl = isRtlDominant(text);
+      slide.addText(text, {
+        x: 0.5,
+        y,
+        w: 7.5,
+        h: 0.45,
+        fontSize: 14,
+        align: rtl ? "right" : "left",
+        rtlMode: rtl,
+        fontFace: rtl ? "Arial" : "Calibri",
+        wrap: true,
+      });
+      y += 0.48;
+    }
+    if (!lines.length) {
+      slide.addText(`Page ${i + 1}`, {
+        x: 0.5,
+        y: 4,
+        w: 7.5,
+        h: 0.5,
+        fontSize: 16,
+        align: "center",
+      });
+    }
   }
 
+  onProgress?.({ stage: "pack", percent: 95 });
   const out = await pptx.write({ outputType: "blob" });
   return out as Blob;
 }
