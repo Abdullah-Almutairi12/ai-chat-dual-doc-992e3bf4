@@ -122,7 +122,7 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
   return new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
-/** PDF → PowerPoint (one slide per page as image). */
+/** PDF → PowerPoint (one slide per page — portrait, local OCR fallback path). */
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const pptxModule = await loadPptxModule();
@@ -132,7 +132,8 @@ export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Bl
   const buf = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buf }).promise;
   const pptx = new PptxGenJS();
-  pptx.layout = "LAYOUT_16x9";
+  pptx.defineLayout({ name: "PDFQUANTA_PORTRAIT", width: 8.5, height: 11 });
+  pptx.layout = "PDFQUANTA_PORTRAIT";
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const { canvas } = await renderPageToCanvas(pdf, i, 1.5);

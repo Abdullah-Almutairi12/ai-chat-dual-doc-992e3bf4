@@ -7,16 +7,18 @@ import {
 } from "@/lib/api-auth.server";
 import {
   convertPdfWithVision,
+  MasterEmptyExtractionError,
   VisionNotConfiguredError,
 } from "@/lib/pdf/vision/convert.server";
-import { MAX_VISION_FILE_BYTES, MAX_VISION_PAGES, type VisionConvertTool } from "@/lib/pdf/vision/schema";
-
-const ALLOWED_TOOLS = new Set<VisionConvertTool>(["pdf-word", "pdf-ppt"]);
+import {
+  MasterBuildValidationError,
+} from "@/lib/pdf/vision/validate.server";
+import { MAX_VISION_FILE_BYTES, MAX_VISION_PAGES, isMasterPdfTool, type MasterConvertTool } from "@/lib/pdf/vision/schema";
 
 /**
  * POST /api/pdf/convert-vision
- * Multipart: file (PDF, required), tool (pdf-word | pdf-ppt)
- * Returns the converted DOCX/PPTX binary (editable text, Vision AI pipeline).
+ * Multipart: file (PDF, required), tool (pdf-word | pdf-ppt | pdf-excel | pdf-html)
+ * PDF Quanta Universal Master Engine — returns validated editable output.
  */
 export const Route = createFileRoute("/api/pdf/convert-vision")({
   server: {
@@ -35,10 +37,13 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
           if (file.size > MAX_VISION_FILE_BYTES) {
             return jsonResponse({ ok: false, error: `File exceeds ${MAX_VISION_FILE_BYTES / (1024 * 1024)}MB limit` }, 413);
           }
-          if (!ALLOWED_TOOLS.has(toolRaw as VisionConvertTool)) {
-            return jsonResponse({ ok: false, error: "tool must be pdf-word or pdf-ppt" }, 400);
+          if (!isMasterPdfTool(toolRaw)) {
+            return jsonResponse(
+              { ok: false, error: "tool must be pdf-word, pdf-ppt, pdf-excel, or pdf-html" },
+              400,
+            );
           }
-          const tool = toolRaw as VisionConvertTool;
+          const tool = toolRaw as MasterConvertTool;
 
           const mime = file.type || "";
           if (mime && mime !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -47,7 +52,7 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
 
           const pdfBytes = new Uint8Array(await file.arrayBuffer());
 
-          const result = await convertPdfWithVision(pdfBytes, tool);
+          const result = await convertPdfWithVision(pdfBytes, tool, file.name);
 
           if (result.pageCount >= MAX_VISION_PAGES) {
             console.warn(
@@ -69,6 +74,7 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
               "x-vision-preferred": result.preferredProvider,
               "x-vision-fallback": result.usedProviderFallback ? "true" : "false",
               "x-vision-pages": String(result.pageCount),
+              "x-master-engine": "true",
             },
           });
         } catch (err) {
@@ -78,9 +84,13 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
           if (err instanceof VisionNotConfiguredError) {
             return jsonResponse({ ok: false, error: "Vision AI is not configured", code: "VISION_NOT_CONFIGURED" }, 503);
           }
+          if (err instanceof MasterBuildValidationError || err instanceof MasterEmptyExtractionError) {
+            console.error("[api/pdf/convert-vision] validation/extraction failed", err.message);
+            return jsonResponse({ ok: false, error: err.message, code: "MASTER_FALLBACK" }, 422);
+          }
           console.error("[api/pdf/convert-vision]", err);
           const message = err instanceof Error ? err.message : "Vision conversion failed";
-          return jsonResponse({ ok: false, error: message }, 500);
+          return jsonResponse({ ok: false, error: message, code: "MASTER_ERROR" }, 500);
         }
       },
     },

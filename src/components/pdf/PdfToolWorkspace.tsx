@@ -16,7 +16,7 @@ import { sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/sec
 import { useEntitlement } from "@/lib/entitlement";
 import { addDocument } from "@/lib/documents";
 import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@/lib/pdf-storage";
-import { convertViaVisionApi, isVisionConvertTool } from "@/lib/pdf/vision-client";
+import { runMasterConversion } from "@/lib/pdf/master-engine-client";
 
 type Props = { toolId: string };
 
@@ -186,25 +186,12 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
         if (tool!.convertMode) {
           const mode = tool!.convertMode;
-          let visionResult: { blob: Blob; ext: string } | null = null;
-
-          if (isVisionConvertTool(mode)) {
-            setProgress({ label: t("pdf_processing"), percent: 10, stage: "vision" });
-            try {
-              visionResult = await convertViaVisionApi(batch[0], mode, (p) =>
-                setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
-              );
-            } catch (visionErr) {
-              console.warn("[PdfToolWorkspace] Vision conversion failed, using client fallback", visionErr);
-              toast.info(t("pdf_vision_fallback"));
-            }
-          }
-
-          const result =
-            visionResult ??
-            (await pdf.runConversion(mode, batch[0], { imageFiles: batch }, (p) =>
-              setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
-            ));
+          const result = await runMasterConversion(
+            mode,
+            batch[0],
+            { imageFiles: batch },
+            (p) => setProgress({ label: t("pdf_processing"), percent: p.percent, stage: p.stage }),
+          );
 
           if (result.blob) {
             setResultBlob(result.blob);

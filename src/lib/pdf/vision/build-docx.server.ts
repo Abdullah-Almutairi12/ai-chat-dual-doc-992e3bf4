@@ -1,12 +1,26 @@
 import { isRtlDominant, normalizeArabicText } from "@/lib/pdf/bidi";
-import type { VisionBlock, VisionPage } from "@/lib/pdf/vision/schema";
+import type { VisionBlock, VisionChart, VisionPage } from "@/lib/pdf/vision/schema";
 
 function rtlFor(text: string, explicit?: boolean): boolean {
   if (typeof explicit === "boolean") return explicit;
   return isRtlDominant(text);
 }
 
-/** Build an editable DOCX from Vision-structured pages. */
+function chartToTableRows(chart: VisionChart): string[][] {
+  const rows: string[][] = [];
+  if (chart.title) rows.push([chart.title]);
+  const categories = chart.categories ?? [];
+  const series = chart.series ?? [];
+  if (categories.length && series.length) {
+    rows.push(["Category", ...series.map((s) => s.name)]);
+    categories.forEach((cat, i) => {
+      rows.push([cat, ...series.map((s) => String(s.values[i] ?? ""))]);
+    });
+  }
+  return rows;
+}
+
+/** Build portrait-oriented editable DOCX from Master Engine pages. */
 export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buffer> {
   const {
     Document,
@@ -20,12 +34,21 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
     TableRow,
     TableCell,
     WidthType,
+    PageOrientation,
   } = await import("docx");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const children: any[] = [];
 
   for (let i = 0; i < pages.length; i++) {
+    if (pages[i].pageTitle) {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text: normalizeArabicText(pages[i].pageTitle!) })],
+        }),
+      );
+    }
     for (const block of pages[i].blocks) {
       children.push(
         ...blockToDocxElements(block, {
@@ -48,12 +71,24 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
   if (!children.length) {
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: "PDF Quanta — Vision export (no text detected)" })],
+        children: [new TextRun({ text: "PDF Quanta" })],
       }),
     );
   }
 
-  const doc = new Document({ sections: [{ children }] });
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { orientation: PageOrientation.PORTRAIT, width: 12240, height: 15840 },
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
+        children,
+      },
+    ],
+  });
   return Packer.toBuffer(doc);
 }
 
@@ -66,6 +101,12 @@ function blockToDocxElements(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any[] {
   const { Paragraph, TextRun, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType } = docx;
+
+  if (block.type === "chart") {
+    const rows = chartToTableRows(block);
+    if (!rows.length) return [];
+    block = { type: "table", rows, rtl: block.rtl };
+  }
 
   switch (block.type) {
     case "heading": {

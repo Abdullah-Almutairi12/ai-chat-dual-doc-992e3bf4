@@ -1,17 +1,37 @@
 import { z } from "zod";
 
+/** Chart data extracted by the Master Engine. */
+export const VisionChartSchema = z.object({
+  chartType: z.enum(["bar", "line", "pie", "column"]).optional(),
+  title: z.string().optional(),
+  categories: z.array(z.string()).optional(),
+  series: z
+    .array(
+      z.object({
+        name: z.string(),
+        values: z.array(z.number()),
+      }),
+    )
+    .optional(),
+});
+
 /** Structured block extracted by Vision AI from a single PDF page. */
 export const VisionBlockSchema = z.object({
-  type: z.enum(["heading", "paragraph", "list", "table"]),
+  type: z.enum(["heading", "paragraph", "list", "table", "chart"]),
   level: z.number().int().min(1).max(6).optional(),
   rtl: z.boolean().optional(),
   text: z.string().optional(),
   items: z.array(z.string()).optional(),
   rows: z.array(z.array(z.string())).optional(),
+  chartType: z.enum(["bar", "line", "pie", "column"]).optional(),
+  title: z.string().optional(),
+  categories: z.array(z.string()).optional(),
+  series: VisionChartSchema.shape.series,
 });
 
 export const VisionPageSchema = z.object({
   pageNumber: z.number().int().positive(),
+  pageTitle: z.string().optional(),
   blocks: z.array(VisionBlockSchema),
 });
 
@@ -32,6 +52,7 @@ export const VisionSlideSchema = z.object({
       rows: z.array(z.array(z.string())),
     })
     .optional(),
+  chart: VisionChartSchema.optional(),
   rtl: z.boolean().optional(),
   notes: z.string().optional(),
 });
@@ -41,14 +62,43 @@ export const VisionPresentationSchema = z.object({
   language: z.string().optional(),
 });
 
+export type VisionChart = z.infer<typeof VisionChartSchema>;
 export type VisionBlock = z.infer<typeof VisionBlockSchema>;
 export type VisionPage = z.infer<typeof VisionPageSchema>;
 export type VisionDocument = z.infer<typeof VisionDocumentSchema>;
 export type VisionSlide = z.infer<typeof VisionSlideSchema>;
 export type VisionPresentation = z.infer<typeof VisionPresentationSchema>;
 
-export type VisionConvertTool = "pdf-word" | "pdf-ppt";
+/** All PDF→format tools routed through the Master Engine (server AI path). */
+export type MasterConvertTool = "pdf-word" | "pdf-ppt" | "pdf-excel" | "pdf-html";
+
+export const MASTER_PDF_TOOLS = new Set<MasterConvertTool>([
+  "pdf-word",
+  "pdf-ppt",
+  "pdf-excel",
+  "pdf-html",
+]);
+
+/** @deprecated Use MasterConvertTool */
+export type VisionConvertTool = MasterConvertTool;
 
 export const MAX_VISION_PAGES = 15;
 export const MAX_VISION_FILE_BYTES = 25 * 1024 * 1024;
 export const VISION_RENDER_SCALE = 2;
+
+export function isMasterPdfTool(mode: string): mode is MasterConvertTool {
+  return MASTER_PDF_TOOLS.has(mode as MasterConvertTool);
+}
+
+export function extForMasterTool(tool: MasterConvertTool): string {
+  switch (tool) {
+    case "pdf-word":
+      return "docx";
+    case "pdf-ppt":
+      return "pptx";
+    case "pdf-excel":
+      return "xlsx";
+    case "pdf-html":
+      return "html";
+  }
+}
