@@ -19,15 +19,15 @@ function firstPublicEnv(...keys: string[]): string | undefined {
 }
 
 export function resolveSupabaseUrl(): string | undefined {
-  return firstPublicEnv("SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
+  return firstPublicEnv("VITE_SUPABASE_URL", "SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
 }
 
 export function resolveSupabasePublishableKey(): string | undefined {
   return firstPublicEnv(
-    "SUPABASE_PUBLISHABLE_KEY",
     "VITE_SUPABASE_PUBLISHABLE_KEY",
-    "SUPABASE_ANON_KEY",
     "VITE_SUPABASE_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_ANON_KEY",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   );
 }

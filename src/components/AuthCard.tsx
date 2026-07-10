@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import { authCallbackUrl } from "@/lib/app-origin";
 
 function safeRedirect(value: unknown): string {
@@ -29,6 +29,10 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSupabaseConfigured()) {
+      toast.error(lang === "ar" ? "خدمة تسجيل الدخول غير متاحة حالياً" : "Sign-in is temporarily unavailable");
+      return;
+    }
     setLoading(true);
     try {
       if (isLogin) {

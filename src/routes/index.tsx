@@ -9,6 +9,8 @@ import { useI18n } from "@/lib/i18n";
 import { tools } from "@/lib/tools";
 
 export const Route = createFileRoute("/")({
+  /** Landing is fully static-friendly — no server loaders or backend deps. */
+  ssr: true,
   head: () => ({
     meta: [
       { title: "PDF Quanta — AI PDF Tools: Chat, Convert & Analyze PDFs" },

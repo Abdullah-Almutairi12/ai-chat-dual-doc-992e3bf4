@@ -1,6 +1,6 @@
 /** Canonical app origin for auth redirects (Vercel / custom domain / local dev). */
 
-import { readServerEnvAlias, SERVER_ENV_ALIASES } from "@/integrations/supabase/env.server";
+import { firstServerEnv } from "@/lib/runtime-env";
 
 export function resolveAppOrigin(): string {
   if (typeof window !== "undefined" && window.location.origin) {
@@ -10,7 +10,7 @@ export function resolveAppOrigin(): string {
   const fromEnv =
     (typeof import.meta !== "undefined" &&
       (import.meta.env as Record<string, string | undefined>).APP_ORIGIN) ||
-    readServerEnvAlias(SERVER_ENV_ALIASES.appOrigin);
+    firstServerEnv("APP_ORIGIN", "VERCEL_URL", "VITE_APP_ORIGIN");
 
   if (!fromEnv?.trim()) return "http://localhost:5173";
 

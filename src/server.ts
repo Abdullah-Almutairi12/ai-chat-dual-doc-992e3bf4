@@ -46,9 +46,14 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    bindRequestEnv(env);
-    hydrateVercelProductionEnv(env);
     try {
+      bindRequestEnv(env);
+      try {
+        hydrateVercelProductionEnv(env);
+      } catch (envErr) {
+        console.warn("[server] env hydration failed (continuing)", envErr);
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
