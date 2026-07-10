@@ -1,5 +1,6 @@
 import { normalizeArabicText } from "@/lib/pdf/bidi";
 import { blockRtl, fontFor, stripHexColor } from "@/lib/pdf/vision/block-layout.server";
+import { finalizeOfficeBuffer } from "@/lib/pdf/vision/response.server";
 import type { VisionBlock, VisionChart, VisionPage } from "@/lib/pdf/vision/schema";
 
 /** STRICT: this module must never embed raster page images — editable native content only. */
@@ -123,7 +124,7 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
       },
     ],
   });
-  return Packer.toBuffer(doc);
+  return finalizeOfficeBuffer(await Packer.toBuffer(doc));
 }
 
 function blockToDocxElements(

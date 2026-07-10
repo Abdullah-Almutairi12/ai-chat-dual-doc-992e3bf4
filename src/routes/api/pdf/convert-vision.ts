@@ -10,9 +10,8 @@ import {
   MasterEmptyExtractionError,
   VisionNotConfiguredError,
 } from "@/lib/pdf/vision/convert.server";
-import {
-  MasterBuildValidationError,
-} from "@/lib/pdf/vision/validate.server";
+import { officeFileResponse } from "@/lib/pdf/vision/response.server";
+import { MasterBuildValidationError } from "@/lib/pdf/vision/validate.server";
 import { MAX_VISION_FILE_BYTES, MAX_VISION_PAGES, isMasterPdfTool, type MasterConvertTool } from "@/lib/pdf/vision/schema";
 
 /**
@@ -63,19 +62,12 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
           const baseName = file.name.replace(/\.pdf$/i, "") || "document";
           const outName = `${baseName}.${result.extension}`;
 
-          return new Response(result.buffer, {
-            status: 200,
-            headers: {
-              "content-type": result.mimeType,
-              "content-disposition": `attachment; filename="${encodeURIComponent(outName)}"`,
-              "cache-control": "no-store",
-              "x-vision-provider": result.provider,
-              "x-vision-model": result.model,
-              "x-vision-preferred": result.preferredProvider,
-              "x-vision-fallback": result.usedProviderFallback ? "true" : "false",
-              "x-vision-pages": String(result.pageCount),
-              "x-master-engine": "true",
-            },
+          return officeFileResponse(result.buffer, outName, result.mimeType, {
+            provider: result.provider,
+            model: result.model,
+            preferredProvider: result.preferredProvider,
+            usedProviderFallback: result.usedProviderFallback,
+            pageCount: result.pageCount,
           });
         } catch (err) {
           if (err instanceof Error && err.message === "Unauthorized") {
@@ -86,6 +78,10 @@ export const Route = createFileRoute("/api/pdf/convert-vision")({
           }
           if (err instanceof MasterBuildValidationError || err instanceof MasterEmptyExtractionError) {
             console.error("[api/pdf/convert-vision] validation/extraction failed", err.message);
+            return jsonResponse({ ok: false, error: err.message, code: "MASTER_FALLBACK" }, 422);
+          }
+          if (err instanceof Error && /Office output|ZIP archive/i.test(err.message)) {
+            console.error("[api/pdf/convert-vision] binary response failed", err.message);
             return jsonResponse({ ok: false, error: err.message, code: "MASTER_FALLBACK" }, 422);
           }
           console.error("[api/pdf/convert-vision]", err);

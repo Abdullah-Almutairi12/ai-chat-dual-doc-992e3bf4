@@ -13,6 +13,7 @@ import {
   PORTRAIT_WIDTH_IN,
 } from "@/lib/pdf/vision/layout-constants";
 import { legacySlideToBlocks } from "@/lib/pdf/vision/legacy-slide.server";
+import { finalizeOfficeBuffer } from "@/lib/pdf/vision/response.server";
 import type { VisionBlock, VisionChart, VisionPage, VisionSlide } from "@/lib/pdf/vision/schema";
 
 /** STRICT: this module must never embed raster page images — editable native content only. */
@@ -283,7 +284,7 @@ export async function buildPptxFromVisionPages(pages: VisionPage[]): Promise<Buf
   }
 
   const out = await pptx.write({ outputType: "nodebuffer" });
-  return Buffer.from(out as ArrayBuffer);
+  return finalizeOfficeBuffer(Buffer.from(out as ArrayBuffer));
 }
 
 /** @deprecated Use buildPptxFromVisionPages — slides are converted to blocks internally. */

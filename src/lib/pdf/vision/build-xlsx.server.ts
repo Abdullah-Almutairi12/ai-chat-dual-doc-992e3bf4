@@ -1,4 +1,5 @@
 import { normalizeArabicText } from "@/lib/pdf/bidi";
+import { finalizeOfficeBuffer } from "@/lib/pdf/vision/response.server";
 import type { VisionBlock, VisionPage } from "@/lib/pdf/vision/schema";
 
 function blockToText(block: VisionBlock): string {
@@ -46,6 +47,6 @@ export async function buildXlsxFromVisionPages(pages: VisionPage[]): Promise<Buf
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Extracted");
-  const out = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  return Buffer.from(out);
+  const out = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as number[];
+  return finalizeOfficeBuffer(Buffer.from(out));
 }

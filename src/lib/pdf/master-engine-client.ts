@@ -54,6 +54,12 @@ export async function convertViaMasterEngine(
         return null;
       }
 
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        console.info("[master-engine] JSON error body instead of binary — using local OCR fallback");
+        return null;
+      }
+
       onProgress?.({ stage: "master-build", percent: 92 });
       const blob = await res.blob();
 

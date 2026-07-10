@@ -1,3 +1,4 @@
+import { parseAiJson } from "@/lib/pdf/vision/ai-json.server";
 import {
   alternateProvider,
   modelForProvider,
@@ -8,28 +9,14 @@ import {
 import { legacySlideToBlocks } from "@/lib/pdf/vision/legacy-slide.server";
 import { masterPageUserPrompt, masterSystemPromptForTool } from "@/lib/pdf/vision/master-prompts.server";
 import type { MasterConvertTool } from "@/lib/pdf/vision/schema";
-import {
-  VisionPageSchema,
-  VisionSlideSchema,
-  type VisionPage,
-} from "@/lib/pdf/vision/schema";
-import { logMaster } from "@/lib/pdf/vision/validate.server";
+import { VisionSlideSchema, type VisionPage } from "@/lib/pdf/vision/schema";
+import { coerceVisionPage, logMaster } from "@/lib/pdf/vision/validate.server";
 
 export type VisionCallMeta = {
   provider: VisionProvider;
   model: string;
   usedProviderFallback: boolean;
 };
-
-function stripJsonFences(raw: string): string {
-  const trimmed = raw.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/i);
-  return (fenced?.[1] ?? trimmed).trim();
-}
-
-function parseJson<T>(raw: string): T {
-  return JSON.parse(stripJsonFences(raw)) as T;
-}
 
 async function callOpenAiVision(
   config: VisionConfig,
@@ -184,31 +171,44 @@ async function extractPageContent(
   );
 }
 
-/** Parse AI JSON into VisionPage — accepts blocks format or legacy slide format. */
-function parseVisionPage(parsed: unknown, pageNumber: number, tool: MasterConvertTool): VisionPage {
-  const pageResult = VisionPageSchema.safeParse(parsed);
-  if (pageResult.success) {
-    return { ...pageResult.data, pageNumber };
+/** Parse cleaned AI JSON into VisionPage — blocks format or legacy slide format. */
+function parseVisionPage(rawContent: string, pageNumber: number, tool: MasterConvertTool): VisionPage {
+  let parsed: unknown;
+  try {
+    parsed = parseAiJson(rawContent);
+  } catch (err) {
+    logMaster("json_parse_failed", {
+      tool,
+      pageNumber,
+      reason: err instanceof Error ? err.message : String(err),
+      sample: rawContent.slice(0, 120),
+    });
+    return { pageNumber, blocks: [] };
   }
+
+  const page = coerceVisionPage(parsed, pageNumber);
+  if (page.blocks.length) return page;
 
   if (tool === "pdf-ppt") {
     const slideResult = VisionSlideSchema.safeParse(parsed);
     if (slideResult.success) {
       const slide = slideResult.data;
-      return {
+      return coerceVisionPage(
+        {
+          pageNumber,
+          pageTitle: slide.title,
+          blocks: legacySlideToBlocks({ ...slide, slideNumber: pageNumber }),
+        },
         pageNumber,
-        pageTitle: slide.title,
-        blocks: legacySlideToBlocks({ ...slide, slideNumber: pageNumber }),
-      };
+      );
     }
   }
 
-  logMaster("schema_reject_page", {
-    tool,
-    pageNumber,
-    issues: pageResult.error.flatten(),
-  });
-  return { pageNumber, blocks: [] };
+  if (!page.blocks.length) {
+    logMaster("schema_reject_page", { tool, pageNumber });
+  }
+
+  return page;
 }
 
 export async function extractWordPage(
@@ -219,8 +219,7 @@ export async function extractWordPage(
   imageBase64: string,
 ): Promise<{ page: VisionPage; meta: VisionCallMeta }> {
   const { content, meta } = await extractPageContent(config, tool, pageNumber, pageCount, imageBase64);
-  const parsed = parseJson<unknown>(content);
-  return { page: parseVisionPage(parsed, pageNumber, tool), meta };
+  return { page: parseVisionPage(content, pageNumber, tool), meta };
 }
 
 export async function extractAllPages(
