@@ -1,4 +1,6 @@
 import { isRtlDominant, normalizeArabicText } from "@/lib/pdf/bidi";
+import { sortBlocksByLayout } from "@/lib/pdf/vision/fusion.server";
+import type { FidelityPageRender } from "@/lib/pdf/vision/build-pptx.server";
 import type { VisionBlock, VisionPage } from "@/lib/pdf/vision/schema";
 
 function escapeHtml(s: string): string {
@@ -9,23 +11,27 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function blockToHtml(block: VisionBlock): string {
+function blockToPositionedHtml(block: VisionBlock): string {
   const rtl = block.rtl ?? isRtlDominant(block.text ?? "");
   const dir = rtl ? ' dir="rtl"' : "";
+  const layout = block.layout;
+  const style = layout
+    ? `position:absolute;left:${((layout.x ?? 0) * 100).toFixed(2)}%;top:${((layout.y ?? 0) * 100).toFixed(2)}%;width:${((layout.w ?? 1) * 100).toFixed(2)}%;`
+    : "position:relative;margin:8px 0;";
 
   switch (block.type) {
     case "heading": {
       const level = Math.min(6, Math.max(1, block.level ?? 2));
       const text = escapeHtml(normalizeArabicText(block.text ?? ""));
-      return text ? `<h${level}${dir}>${text}</h${level}>` : "";
+      return text ? `<h${level}${dir} class="blk" style="${style}">${text}</h${level}>` : "";
     }
     case "paragraph": {
       const text = escapeHtml(normalizeArabicText(block.text ?? ""));
-      return text ? `<p${dir}>${text}</p>` : "";
+      return text ? `<p${dir} class="blk" style="${style}">${text}</p>` : "";
     }
     case "list": {
       const items = (block.items ?? []).map((i) => `<li>${escapeHtml(normalizeArabicText(i))}</li>`).join("");
-      return items ? `<ul${dir}>${items}</ul>` : "";
+      return items ? `<ul${dir} class="blk" style="${style}">${items}</ul>` : "";
     }
     case "table": {
       const rows = block.rows ?? [];
@@ -36,42 +42,38 @@ function blockToHtml(block: VisionBlock): string {
             `<tr>${row.map((c) => (ri === 0 ? `<th>${escapeHtml(normalizeArabicText(c))}</th>` : `<td>${escapeHtml(normalizeArabicText(c))}</td>`)).join("")}</tr>`,
         )
         .join("");
-      return `<table${dir} border="1" cellpadding="4">${body}</table>`;
-    }
-    case "chart": {
-      const title = block.title ? `<caption>${escapeHtml(normalizeArabicText(block.title))}</caption>` : "";
-      const cats = block.categories ?? [];
-      const series = block.series ?? [];
-      if (!cats.length || !series.length) return "";
-      const header = `<tr><th>Category</th>${series.map((s) => `<th>${escapeHtml(normalizeArabicText(s.name))}</th>`).join("")}</tr>`;
-      const body = cats
-        .map(
-          (cat, i) =>
-            `<tr><td>${escapeHtml(normalizeArabicText(cat))}</td>${series.map((s) => `<td>${s.values[i] ?? ""}</td>`).join("")}</tr>`,
-        )
-        .join("");
-      return `<table class="chart-data"${dir}>${title}${header}${body}</table>`;
+      return `<table${dir} class="blk" style="${style}" border="1" cellpadding="4">${body}</table>`;
     }
     case "shape": {
       const fill = (block.fillColor ?? "").replace(/^#/, "");
       const label = escapeHtml(normalizeArabicText(block.text ?? ""));
-      const style = fill ? `background:#${fill};padding:8px;min-height:24px;` : "padding:8px;";
-      return label ? `<div class="shape"${dir} style="${style}">${label}</div>` : `<div class="shape" style="${style}">&nbsp;</div>`;
+      const bg = fill ? `background:#${fill};` : "";
+      return `<div class="blk shape"${dir} style="${style}${bg}">${label || "&nbsp;"}</div>`;
     }
-    default:
-      return "";
+    default: {
+      const text = escapeHtml(normalizeArabicText(block.text ?? ""));
+      return text ? `<p${dir} class="blk" style="${style}">${text}</p>` : "";
+    }
   }
 }
 
-/** Build semantic HTML from Master Engine pages (portrait-friendly). */
-export async function buildHtmlFromVisionPages(pages: VisionPage[], title = "Document"): Promise<Buffer> {
+/** Build pixel-faithful HTML from Master Engine pages (Adobe-style layout). */
+export async function buildHtmlFromVisionPages(
+  pages: VisionPage[],
+  title = "Document",
+  renders?: FidelityPageRender[],
+): Promise<Buffer> {
   const sections = pages
     .map((page) => {
+      const render = renders?.find((r) => r.pageNumber === page.pageNumber);
+      const bg = render
+        ? `<img class="page-bg" src="data:image/png;base64,${render.base64}" alt="Page ${page.pageNumber}"/>`
+        : "";
+      const body = sortBlocksByLayout(page.blocks).map(blockToPositionedHtml).filter(Boolean).join("\n");
       const heading = page.pageTitle
-        ? `<h2>${escapeHtml(normalizeArabicText(page.pageTitle))}</h2>`
-        : `<h2>Page ${page.pageNumber}</h2>`;
-      const body = page.blocks.map(blockToHtml).filter(Boolean).join("\n");
-      return `<section class="page">${heading}${body || "<p>&nbsp;</p>"}</section>`;
+        ? `<h2 class="page-title">${escapeHtml(normalizeArabicText(page.pageTitle))}</h2>`
+        : "";
+      return `<section class="page">${bg}<div class="layer">${heading}${body || "<p>&nbsp;</p>"}</div></section>`;
     })
     .join("\n");
 
@@ -82,10 +84,14 @@ export async function buildHtmlFromVisionPages(pages: VisionPage[], title = "Doc
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>${escapeHtml(title)}</title>
 <style>
-  body { font-family: Calibri, "Traditional Arabic", sans-serif; max-width: 816px; margin: 0 auto; padding: 24px; }
-  section.page { page-break-after: always; margin-bottom: 2rem; }
-  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-  th, td { border: 1px solid #ccc; padding: 6px 8px; }
+  body { font-family: Calibri, "Traditional Arabic", Arial, sans-serif; margin: 0; background: #525659; padding: 24px 0; }
+  section.page { position: relative; width: 816px; min-height: 1056px; margin: 0 auto 24px; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.35); page-break-after: always; overflow: hidden; }
+  .page-bg { position: absolute; inset: 0; width: 100%; height: auto; z-index: 0; }
+  .layer { position: relative; z-index: 1; min-height: 1056px; }
+  .page-title { margin: 16px; }
+  .blk { box-sizing: border-box; unicode-bidi: isolate; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: 4px 6px; }
 </style>
 </head>
 <body>

@@ -103,10 +103,11 @@ export const consumeFile = createServerFn({ method: "POST" })
         });
         if (error) {
           console.error("[consumeFile] rpc error", error.message);
-          // Transient DB/RPC errors must not block client-side PDF processing.
-          return defaultFreeEntitlement();
+          const filesProcessed = await readFilesProcessed(supabase, userId);
+          allowed = filesProcessed < FREE_FILE_LIMIT;
+        } else {
+          allowed = ok === true;
         }
-        allowed = ok === true;
       }
 
       if (allowed) {

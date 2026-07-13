@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import {
   authenticateRequest,
+  configErrorResponse,
   jsonResponse,
   unauthorizedResponse,
+  ApiConfigError,
 } from "@/lib/api-auth.server";
 import { FREE_FILE_LIMIT } from "@/lib/entitlement.constants";
 import { ensureUserProfile, readFilesProcessed } from "@/lib/entitlement.server";
@@ -60,7 +62,8 @@ export const Route = createFileRoute("/api/pdf/consume")({
             });
             if (error) {
               console.error("[api/pdf/consume] rpc error", error.message);
-              allowed = true;
+              const filesProcessed = await readFilesProcessed(supabase, userId);
+              allowed = filesProcessed < FREE_FILE_LIMIT;
             } else {
               allowed = ok === true;
             }
@@ -88,6 +91,9 @@ export const Route = createFileRoute("/api/pdf/consume")({
             remaining,
           });
         } catch (err) {
+          if (err instanceof ApiConfigError) {
+            return configErrorResponse(err);
+          }
           if (err instanceof Error && err.message === "Unauthorized") {
             return unauthorizedResponse();
           }

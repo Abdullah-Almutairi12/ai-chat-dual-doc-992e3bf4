@@ -1,5 +1,7 @@
 import { normalizeArabicText } from "@/lib/pdf/bidi";
 import { blockRtl, fontFor, stripHexColor } from "@/lib/pdf/vision/block-layout.server";
+import { sortBlocksByLayout } from "@/lib/pdf/vision/fusion.server";
+import type { FidelityPageRender } from "@/lib/pdf/vision/build-pptx.server";
 import { finalizeOfficeBuffer } from "@/lib/pdf/vision/response.server";
 import type { VisionBlock, VisionChart, VisionPage } from "@/lib/pdf/vision/schema";
 
@@ -40,9 +42,11 @@ function defaultFontSize(block: VisionBlock): number {
   }
 }
 
-/** Build portrait-oriented editable DOCX from Master Engine blocks — no raster images. */
-export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buffer> {
-  assertNoImageEmbed();
+/** Build portrait-oriented editable DOCX with layout-aware spacing. */
+export async function buildDocxFromVisionPages(
+  pages: VisionPage[],
+  _renders?: FidelityPageRender[],
+): Promise<Buffer> {
 
   const {
     Document,
@@ -83,7 +87,7 @@ export async function buildDocxFromVisionPages(pages: VisionPage[]): Promise<Buf
         }),
       );
     }
-    for (const block of pages[i].blocks) {
+    for (const block of sortBlocksByLayout(pages[i].blocks)) {
       children.push(
         ...blockToDocxElements(block, {
           Paragraph,

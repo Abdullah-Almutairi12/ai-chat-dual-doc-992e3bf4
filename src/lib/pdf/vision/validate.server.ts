@@ -6,8 +6,7 @@ import {
   type VisionPage,
 } from "@/lib/pdf/vision/schema";
 
-const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04] as const;
-const MIN_OFFICE_BYTES = 512;
+import { validateOfficeZipBytes } from "@/lib/pdf/office-zip";
 
 export function logMaster(stage: string, meta: Record<string, unknown> = {}): void {
   console.info(`[master-engine] ${stage}`, JSON.stringify({ ts: new Date().toISOString(), ...meta }));
@@ -193,21 +192,18 @@ export function countPageContent(pages: VisionPage[]): number {
   return pages.reduce((sum, p) => sum + p.blocks.length, 0);
 }
 
-function isZipBuffer(buf: Buffer | Uint8Array): boolean {
-  if (buf.length < MIN_OFFICE_BYTES) return false;
-  return ZIP_MAGIC.every((byte, i) => buf[i] === byte);
-}
+const MIN_OFFICE_BYTES = 512;
 
 export function validateDocxBuffer(buf: Buffer): boolean {
-  return isZipBuffer(buf) && buf.length >= MIN_OFFICE_BYTES;
+  return buf.length >= MIN_OFFICE_BYTES && validateOfficeZipBytes(buf, "docx");
 }
 
 export function validatePptxBuffer(buf: Buffer): boolean {
-  return isZipBuffer(buf) && buf.length >= MIN_OFFICE_BYTES;
+  return buf.length >= MIN_OFFICE_BYTES && validateOfficeZipBytes(buf, "pptx");
 }
 
 export function validateXlsxBuffer(buf: Buffer): boolean {
-  return isZipBuffer(buf) && buf.length >= MIN_OFFICE_BYTES;
+  return buf.length >= MIN_OFFICE_BYTES && validateOfficeZipBytes(buf, "xlsx");
 }
 
 export function validateHtmlBuffer(buf: Buffer): boolean {

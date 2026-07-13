@@ -14,7 +14,11 @@ export async function loadPdfjs() {
 
 export async function readPdfBytes(file: File | Blob): Promise<Uint8Array> {
   const buf = await file.arrayBuffer();
-  return new Uint8Array(buf);
+  const bytes = new Uint8Array(buf);
+  if (bytes.byteLength >= 5 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return bytes;
+  }
+  throw new Error("Invalid or corrupt PDF file");
 }
 
 export async function loadPdfLib(file: File | Blob): Promise<PDFDocument> {

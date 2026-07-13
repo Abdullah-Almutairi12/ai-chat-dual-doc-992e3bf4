@@ -3,10 +3,17 @@
 import { readServerEnv } from "@/lib/runtime-env";
 
 function readPublicEnv(key: string): string | undefined {
+  // Server handlers: prefer live process/request env over build-time import.meta
+  if (typeof window === "undefined") {
+    const fromServer = readServerEnv(key);
+    if (fromServer) return fromServer;
+  }
+
   if (typeof import.meta !== "undefined") {
     const fromImport = (import.meta.env as Record<string, string | undefined>)[key];
     if (typeof fromImport === "string" && fromImport.trim()) return fromImport.trim();
   }
+
   return readServerEnv(key);
 }
 

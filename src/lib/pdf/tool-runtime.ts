@@ -33,3 +33,40 @@ export async function finalizeOutput(
   const format = explicitFormat ?? formatFromFileName(fileName);
   return ensureValidOutput(blob, format);
 }
+
+export type ConversionRunResult = {
+  blob?: Blob;
+  blobs?: { name: string; blob: Blob }[];
+  ext: string;
+};
+
+export type AppliedConversion =
+  | { kind: "single"; blob: Blob; fileName: string }
+  | { kind: "multi"; downloaded: number; total: number };
+
+/**
+ * Validate a conversion result and normalize into a single downloadable file
+ * or a count of multi-file downloads.
+ */
+export async function applyConversionResult(
+  result: ConversionRunResult,
+  baseName: string,
+): Promise<AppliedConversion | null> {
+  if (result.blob) {
+    const fileName = `${baseName}.${result.ext}`;
+    const valid = await finalizeOutput(result.blob, fileName);
+    if (!valid) return null;
+    return { kind: "single", blob: valid, fileName };
+  }
+
+  if (result.blobs?.length) {
+    const { validatedDownloadBlob } = await import("@/lib/pdf/security");
+    let downloaded = 0;
+    for (const item of result.blobs) {
+      if (await validatedDownloadBlob(item.blob, item.name)) downloaded++;
+    }
+    return { kind: "multi", downloaded, total: result.blobs.length };
+  }
+
+  return null;
+}

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, Play } from "lucide-react";
+import { AlertCircle, ArrowLeft, Download, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@
 import { runMasterConversion } from "@/lib/pdf/master-engine-client";
 import { validateBatchSize } from "@/lib/pdf/batch";
 import type { PdfProgress } from "@/lib/pdf/progress";
-import { finalizeOutput, logToolError } from "@/lib/pdf/tool-runtime";
+import { applyConversionResult, finalizeOutput, logToolError } from "@/lib/pdf/tool-runtime";
 
 type Props = { toolId: string };
 
@@ -36,7 +36,9 @@ export function PdfToolWorkspace({ toolId }: Props) {
   >({ label: "", percent: 0, stage: "" });
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultName, setResultName] = useState("output.pdf");
+  const [processError, setProcessError] = useState<string | null>(null);
   const runLockRef = useRef(false);
+  const runIdRef = useRef(0);
 
   // Tool-specific options
   const [wmText, setWmText] = useState("CONFIDENTIAL");
@@ -101,6 +103,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
     }
     setFiles(picked);
     setResultBlob(null);
+    setProcessError(null);
     toast.success(t("uploaded"));
 
     const readyForAutoRun = !tool.multiFile || picked.length >= 2;
@@ -158,18 +161,24 @@ export function PdfToolWorkspace({ toolId }: Props) {
     [user, loading, entitlement, toolId, t, navigate, openUpgrade, tryConsume, refreshEntitlement],
   );
 
-  const persistUploads = async (batch: File[], output?: { blob: Blob; name: string }) => {
+  const persistUploads = (batch: File[], output?: { blob: Blob; name: string }) => {
     if (!user) return;
-    for (const f of batch) {
-      await uploadFileViaApi(f, { bucket: STORAGE_BUCKETS.pdfTools, toolId });
-    }
-    if (output) {
-      await persistProcessedFile(user.id, output.blob, {
-        bucket: STORAGE_BUCKETS.documents,
-        toolId,
-        fileName: output.name,
-      });
-    }
+    void (async () => {
+      try {
+        for (const f of batch) {
+          await uploadFileViaApi(f, { bucket: STORAGE_BUCKETS.pdfTools, toolId });
+        }
+        if (output) {
+          await persistProcessedFile(user.id, output.blob, {
+            bucket: STORAGE_BUCKETS.documents,
+            toolId,
+            fileName: output.name,
+          });
+        }
+      } catch (err) {
+        console.warn("[PdfToolWorkspace] background upload failed", err);
+      }
+    })();
   };
 
   const run = useCallback(
@@ -184,10 +193,17 @@ export function PdfToolWorkspace({ toolId }: Props) {
         return;
       }
       runLockRef.current = true;
+      const runId = ++runIdRef.current;
 
       setProcessing(true);
+      setProcessError(null);
       setProgress({ label: t("pdf_processing"), percent: 5, stage: "" });
       setResultBlob(null);
+
+      const onProgress = (p: PdfProgress) => {
+        if (runIdRef.current !== runId) return;
+        reportProgress(p);
+      };
 
       try {
         if (!user) {
@@ -205,23 +221,29 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
         if (tool!.convertMode) {
           const mode = tool!.convertMode;
-          const result = await runMasterConversion(mode, batch[0], { imageFiles: batch }, reportProgress);
+          const result = await runMasterConversion(mode, batch[0], { imageFiles: batch }, onProgress);
 
-          if (result.blob) {
-            const valid = await finalizeOutput(result.blob, `${base}.${result.ext}`);
-            if (valid) {
-              setResultBlob(valid);
-              setResultName(`${base}.${result.ext}`);
-              await persistUploads(batch, { blob: valid, name: `${base}.${result.ext}` });
+          if (result.meta.usedFallback) {
+            toast.info(t("pdf_vision_fallback"));
+          }
+
+          const applied = await applyConversionResult(result, base);
+          if (applied?.kind === "single") {
+            setResultBlob(applied.blob);
+            setResultName(applied.fileName);
+            persistUploads(batch, { blob: applied.blob, name: applied.fileName });
+            toast.success(t("convert_done"));
+          } else if (applied?.kind === "multi") {
+            persistUploads(batch);
+            if (applied.downloaded > 0) {
               toast.success(t("convert_done"));
+            } else {
+              setProcessError(t("pdf_output_invalid"));
+              toast.error(t("pdf_output_invalid"));
             }
-          } else if (result.blobs?.length) {
-            let downloaded = 0;
-            for (const b of result.blobs) {
-              if (await pdf.validatedDownloadBlob(b.blob, b.name)) downloaded++;
-            }
-            await persistUploads(batch);
-            if (downloaded > 0) toast.success(t("convert_done"));
+          } else {
+            setProcessError(t("pdf_process_failed"));
+            toast.error(t("pdf_process_failed"));
           }
           return;
         }
@@ -230,11 +252,12 @@ export function PdfToolWorkspace({ toolId }: Props) {
           const batchCheck = validateBatchSize(batch);
           if (!batchCheck.ok) {
             logToolError(toolId, new Error(`batch_${batchCheck.reason}`));
+            setProcessError(t("pdf_batch_too_large"));
+            toast.error(t("pdf_batch_too_large"));
             return;
           }
         }
 
-        const onProgress = reportProgress;
         let blob: Blob | null = null;
         let outName = `${base}.pdf`;
 
@@ -249,8 +272,12 @@ export function PdfToolWorkspace({ toolId }: Props) {
           for (const [i, part] of parts.entries()) {
             if (await pdf.validatedDownloadBlob(part, `${base}-part-${i + 1}.pdf`)) downloaded++;
           }
-          await persistUploads(batch);
+          persistUploads(batch);
           if (downloaded > 0) toast.success(t("convert_done"));
+          else {
+            setProcessError(t("pdf_output_invalid"));
+            toast.error(t("pdf_output_invalid"));
+          }
           return;
         }
         case "rotate":
@@ -349,25 +376,40 @@ export function PdfToolWorkspace({ toolId }: Props) {
           break;
         }
         default:
+          toast.error(t("pdf_tool_not_found"));
+          return;
+        }
+
+        if (!blob) {
+          setProcessError(t("pdf_process_failed"));
+          toast.error(t("pdf_process_failed"));
           return;
         }
 
         const valid = await finalizeOutput(blob, outName);
         if (!valid) {
           logToolError(toolId, new Error("invalid_output"));
+          setProcessError(t("pdf_output_invalid"));
+          toast.error(t("pdf_output_invalid"));
           return;
         }
 
         setResultBlob(valid);
         setResultName(outName);
-        await persistUploads(batch, { blob: valid, name: outName });
+        persistUploads(batch, { blob: valid, name: outName });
         toast.success(t("convert_done"));
     } catch (err) {
-      logToolError(toolId, err);
-      // Never expose raw API/technical errors — silent log only
+      if (runIdRef.current === runId) {
+        logToolError(toolId, err);
+        setProcessError(t("pdf_process_failed"));
+        setProgress((prev) => ({ ...prev, label: t("pdf_process_failed"), stage: "error" }));
+        toast.error(t("pdf_process_failed"));
+      }
     } finally {
-      setProcessing(false);
-      runLockRef.current = false;
+      if (runIdRef.current === runId) {
+        setProcessing(false);
+        runLockRef.current = false;
+      }
     }
   },
     [
@@ -519,6 +561,32 @@ export function PdfToolWorkspace({ toolId }: Props) {
         </div>
       )}
 
+      {processError && !processing && (
+        <div className="mt-6 rounded-2xl border border-destructive/40 bg-destructive/5 p-6 shadow-soft">
+          <div className="flex flex-col items-center text-center">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
+              <AlertCircle className="h-7 w-7" />
+            </span>
+            <p className="mt-4 text-sm font-medium text-destructive">{processError}</p>
+            {progress.stage === "error" && progress.percent > 0 ? (
+              <p className="mt-1 text-xs text-muted-foreground">{progress.percent}%</p>
+            ) : null}
+            <Button
+              variant="outline"
+              className="mt-4 gap-2"
+              disabled={!files.length}
+              onClick={() => {
+                setProcessError(null);
+                void run();
+              }}
+            >
+              <Play className="h-4 w-4" />
+              {t("quiz_retry")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {resultBlob && !processing && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -527,8 +595,9 @@ export function PdfToolWorkspace({ toolId }: Props) {
               variant="outline"
               className="gap-2"
               onClick={async () => {
-                const { downloadBlob } = await import("@/lib/pdf/security");
-                downloadBlob(resultBlob, resultName);
+                const { validatedDownloadBlob } = await import("@/lib/pdf/security");
+                const ok = await validatedDownloadBlob(resultBlob, resultName);
+                if (!ok) toast.error(t("pdf_output_invalid"));
               }}
             >
               <Download className="h-4 w-4" />

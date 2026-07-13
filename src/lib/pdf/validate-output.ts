@@ -1,7 +1,9 @@
+import { validateOfficeBlob } from "@/lib/pdf/office-zip";
+
 export type OutputFormat = "pdf" | "docx" | "pptx" | "xlsx" | "html" | "jpg" | "jpeg" | "png";
 
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04] as const;
-const MIN_BYTES = 128;
+const MIN_BYTES = 512;
 
 function headBytes(blob: Blob, n = 8): Promise<Uint8Array> {
   return blob.slice(0, n).arrayBuffer().then((b) => new Uint8Array(b));
@@ -37,7 +39,8 @@ export function formatFromFileName(name: string): OutputFormat {
 
 /** Inspect blob magic bytes — rejects empty or corrupted outputs before download. */
 export async function validateOutputBlob(blob: Blob, format: OutputFormat): Promise<boolean> {
-  if (!blob || blob.size < MIN_BYTES) return false;
+  if (!blob?.size) return false;
+  if (format !== "html" && blob.size < MIN_BYTES) return false;
   const h = await headBytes(blob, 8);
 
   switch (format) {
@@ -46,15 +49,16 @@ export async function validateOutputBlob(blob: Blob, format: OutputFormat): Prom
     case "docx":
     case "pptx":
     case "xlsx":
-      return isZip(h);
+      if (!isZip(h) || blob.size < MIN_BYTES) return false;
+      return validateOfficeBlob(blob, format);
     case "jpg":
     case "jpeg":
       return isJpeg(h);
     case "png":
       return isPng(h);
     case "html": {
-      const text = await blob.slice(0, 256).text();
-      return /<!DOCTYPE|<html/i.test(text);
+      const text = await blob.slice(0, Math.min(512, blob.size)).text();
+      return /<!DOCTYPE|<html/i.test(text) && blob.size >= 32;
     }
     default:
       return blob.size >= MIN_BYTES;

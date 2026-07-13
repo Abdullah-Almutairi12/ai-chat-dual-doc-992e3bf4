@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import {
   authenticateRequest,
+  configErrorResponse,
   jsonResponse,
   unauthorizedResponse,
+  ApiConfigError,
 } from "@/lib/api-auth.server";
 import {
   buildStorageObjectPath,
@@ -11,6 +13,7 @@ import {
   STORAGE_BUCKETS,
   type StorageBucketId,
 } from "@/integrations/supabase/storage-buckets";
+import { MAX_FILE_BYTES } from "@/lib/pdf/security";
 
 const ALLOWED_BUCKETS = new Set<string>(Object.values(STORAGE_BUCKETS));
 
@@ -29,6 +32,12 @@ export const Route = createFileRoute("/api/pdf/upload")({
           const file = form.get("file");
           if (!(file instanceof File) || file.size === 0) {
             return jsonResponse({ ok: false, error: "No file provided" }, 400);
+          }
+          if (file.size > MAX_FILE_BYTES) {
+            return jsonResponse(
+              { ok: false, error: `File exceeds ${MAX_FILE_BYTES / (1024 * 1024)}MB limit`, code: "FILE_TOO_LARGE" },
+              413,
+            );
           }
 
           const bucketRaw = String(form.get("bucket") ?? "").trim();
@@ -58,6 +67,9 @@ export const Route = createFileRoute("/api/pdf/upload")({
             size: file.size,
           });
         } catch (err) {
+          if (err instanceof ApiConfigError) {
+            return configErrorResponse(err);
+          }
           if (err instanceof Error && err.message === "Unauthorized") {
             return unauthorizedResponse();
           }

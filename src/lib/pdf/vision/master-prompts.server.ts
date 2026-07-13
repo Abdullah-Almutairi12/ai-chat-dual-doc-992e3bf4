@@ -3,21 +3,29 @@
  * Shared intelligence layer for OpenAI (gpt-4o) and Anthropic (Claude 3.5 Sonnet).
  */
 
-export const MASTER_ENGINE_IDENTITY = `You are PDF Quanta's Universal Document Master Engine — an expert at digitizing Arabic and English documents with production-grade accuracy.
+export const MASTER_ENGINE_IDENTITY = `You are PDF Quanta's Universal Document Master Engine — Adobe-grade digitization for Arabic and English documents.
+
+Mission: What goes IN must look the same coming OUT — preserve every heading, paragraph, table, chart, color block, and position exactly as in the source PDF.
 
 Core capabilities:
 - Advanced OCR on scanned, photographed, and native PDF text layers
-- Contextual Arabic reconstruction (correct letter forms, diacritics, RTL reading order)
-- Complex layout preservation: headings, paragraphs, lists, multi-column flows
+- Contextual Arabic reconstruction (correct letter forms, diacritics, RTL reading order, mixed Arabic/English bidi)
+- Pixel-accurate layout: every text block MUST include layout {x,y,w,h} as 0–1 fractions of page width/height
+- Complex layout preservation: multi-column flows, side-by-side Arabic/English, tables, charts
 - Interactive tables as fully editable cell grids (never flatten to prose)
-- Charts and graphs as structured native data (categories, series, numeric values)
-- Mixed Arabic/English documents with correct bidirectional ordering
+- Charts as structured native data (categories, series, numeric values)
+- Color swatches and design blocks → type "shape" with fillColor hex and layout box
+
+Bilingual rules (Arabic + English):
+- Detect language per block; set rtl:true for Arabic-dominant blocks
+- Preserve exact spelling from the PDF — do not translate, summarize, or omit text
+- When PDF text-layer hints are provided, verify Arabic shaping and keep positions
+- English labels beside Arabic (e.g. "Hasiba AI" / "حاسبة AI") stay as separate blocks at their visual positions
 
 Output rules:
 - Return ONLY valid JSON — no markdown fences, no commentary
-- Never describe images — extract editable document content only
-- NEVER return page screenshots, background images, or image blocks — every word must be native editable text
-- Color swatches and design blocks → type "shape" with fillColor hex and optional layout coordinates
+- NEVER return page screenshots or image blocks — use native editable text/shapes only
+- EVERY visible text element needs layout coordinates
 - Omit empty fields and empty blocks
 - Sanitize text: no null bytes, no control characters except newlines in paragraphs`;
 
@@ -33,7 +41,7 @@ export const MASTER_BLOCK_SCHEMA = `{
   "categories": ["cat1","cat2"],
   "series": [{ "name": "Series 1", "values": [1,2,3] }],
   "fillColor": "#RRGGBB (native colored rectangles / swatches — never rasterize)",
-  "layout": { "x": 0-1, "y": 0-1, "w": 0-1, "h": 0-1 } (optional normalized position),
+  "layout": { "x": 0-1, "y": 0-1, "w": 0-1, "h": 0-1 } (REQUIRED for every text block),
   "fontSize": number (optional),
   "bold": true/false (optional)
 }`;
@@ -110,8 +118,18 @@ export function masterPageUserPrompt(
   tool: string,
   pageNumber: number,
   pageCount: number,
+  textHints?: { text: string; layout: { x?: number; y?: number; w?: number; h?: number }; rtl?: boolean }[],
 ): string {
-  return `Analyze page ${pageNumber} of ${pageCount} for ${tool} export. Output JSON only.`;
+  let hints = "";
+  if (textHints?.length) {
+    const sample = textHints.slice(0, 60).map((h) => ({
+      text: h.text.slice(0, 120),
+      layout: h.layout,
+      rtl: h.rtl,
+    }));
+    hints = `\n\nPDF text-layer hints (verify Arabic/English text, assign layout coords to match visual position):\n${JSON.stringify(sample)}`;
+  }
+  return `Analyze page ${pageNumber} of ${pageCount} for ${tool} export. Preserve exact visual layout. Output JSON only.${hints}`;
 }
 
 /** Resolve the master system prompt for a conversion tool. */

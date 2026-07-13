@@ -10,6 +10,7 @@ import { legacySlideToBlocks } from "@/lib/pdf/vision/legacy-slide.server";
 import { masterPageUserPrompt, masterSystemPromptForTool } from "@/lib/pdf/vision/master-prompts.server";
 import type { MasterConvertTool } from "@/lib/pdf/vision/schema";
 import { VisionSlideSchema, type VisionPage } from "@/lib/pdf/vision/schema";
+import type { PageTextLayer } from "@/lib/pdf/vision/text-layer.server";
 import { coerceVisionPage, logMaster } from "@/lib/pdf/vision/validate.server";
 
 export type VisionCallMeta = {
@@ -160,12 +161,14 @@ async function extractPageContent(
   pageNumber: number,
   pageCount: number,
   imageBase64: string,
+  textLayer?: PageTextLayer,
 ): Promise<{ content: string; meta: VisionCallMeta }> {
+  const hints = textLayer?.boxes.map((b) => ({ text: b.text, layout: b.layout, rtl: b.rtl }));
   return callVisionModel(
     config,
     tool,
     masterSystemPromptForTool(tool),
-    masterPageUserPrompt(tool, pageNumber, pageCount),
+    masterPageUserPrompt(tool, pageNumber, pageCount, hints),
     imageBase64,
     pageNumber,
   );
@@ -217,8 +220,9 @@ export async function extractWordPage(
   pageNumber: number,
   pageCount: number,
   imageBase64: string,
+  textLayer?: PageTextLayer,
 ): Promise<{ page: VisionPage; meta: VisionCallMeta }> {
-  const { content, meta } = await extractPageContent(config, tool, pageNumber, pageCount, imageBase64);
+  const { content, meta } = await extractPageContent(config, tool, pageNumber, pageCount, imageBase64, textLayer);
   return { page: parseVisionPage(content, pageNumber, tool), meta };
 }
 
@@ -226,8 +230,10 @@ export async function extractAllPages(
   config: VisionConfig,
   tool: MasterConvertTool,
   pages: { pageNumber: number; base64: string }[],
+  textLayers?: PageTextLayer[],
 ): Promise<{ data: VisionPage[]; lastMeta: VisionCallMeta }> {
   const pageCount = pages.length;
+  const layerMap = new Map(textLayers?.map((l) => [l.pageNumber, l]) ?? []);
   let lastMeta: VisionCallMeta = {
     provider: config.provider,
     model: modelForProvider(config, config.provider),
@@ -242,6 +248,7 @@ export async function extractAllPages(
       page.pageNumber,
       pageCount,
       page.base64,
+      layerMap.get(page.pageNumber),
     );
     results.push(extracted);
     lastMeta = meta;

@@ -1,4 +1,5 @@
 import { groupIntoLines, joinLineItems, isRtlDominant, normalizeArabicText } from "./bidi";
+import { pixelBoxToInches } from "./layout-fidelity";
 import { loadPdfjs, renderPageToCanvas } from "./loader";
 import { downloadBlob } from "./security";
 import {
@@ -13,12 +14,11 @@ export type ConvertProgress = import("./progress").PdfProgress;
 
 type ProgressFn = (p: ConvertProgress) => void;
 
-/** PDF → DOCX with RTL-aware paragraphs from layout engine. */
+/** PDF → DOCX with Adobe-style positioned text from layout engine. */
 export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const { extractLayout } = await import("@/lib/pdf-layout");
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak, HeadingLevel } =
-    await loadDocxModule();
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak } = await loadDocxModule();
 
   onProgress?.({ stage: "layout", percent: 5 });
   const layout = await extractLayout(file, (p) =>
@@ -34,27 +34,22 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
   const children: any[] = [];
   for (let i = 0; i < layout.pages.length; i++) {
     const page = layout.pages[i];
-    const lines = groupIntoLines(
-      page.boxes.map((b) => ({
-        text: b.text,
-        left: b.left,
-        top: b.top,
-        width: b.width,
-        height: b.height,
-      })),
-    );
-    for (const line of lines) {
-      const text = normalizeArabicText(joinLineItems(line));
+    for (const box of page.boxes) {
+      const text = normalizeArabicText(box.text);
       if (!text) continue;
-      const rtl = isRtlDominant(text);
+      const rtl = box.rtl || isRtlDominant(text);
+      const pos = pixelBoxToInches(box, page.width, page.height);
       children.push(
         new Paragraph({
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
+          indent: { left: Math.round(pos.x * 1440) },
+          spacing: { before: Math.round(pos.y * 144), after: 40 },
           children: [
             new TextRun({
               text,
               rightToLeft: rtl,
               font: rtl ? "Arial" : "Calibri",
+              size: Math.round(pos.fontSize * 2),
             }),
           ],
         }),
@@ -66,12 +61,7 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
   }
 
   if (!children.length) {
-    children.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun("PDF Quanta — exported document")],
-      }),
-    );
+    children.push(new Paragraph({ children: [new TextRun("PDF Quanta — exported document")] }));
   }
 
   onProgress?.({ stage: "pack", percent: 90 });
@@ -122,7 +112,7 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
   return new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
-/** PDF → PowerPoint (one slide per page — portrait, editable text via layout OCR). */
+/** PDF → PowerPoint — Adobe-style positioned editable text per page. */
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const { extractLayout } = await import("@/lib/pdf-layout");
@@ -146,43 +136,39 @@ export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Bl
   for (let i = 0; i < layout.pages.length; i++) {
     const page = layout.pages[i];
     const slide = pptx.addSlide();
-    const lines = groupIntoLines(
-      page.boxes.map((b) => ({
-        text: b.text,
-        left: b.left,
-        top: b.top,
-        width: b.width,
-        height: b.height,
-      })),
-    );
-    let y = 0.5;
-    for (const line of lines) {
-      if (y > 10) break;
-      const text = normalizeArabicText(joinLineItems(line));
+    const scanned = layout.usedOcr && layout.ocrPageCount > 0 && page.boxes.length > 0;
+
+    if (scanned || page.image) {
+      slide.addImage({
+        data: page.image,
+        x: 0,
+        y: 0,
+        w: 8.5,
+        h: 11,
+      });
+    }
+
+    for (const box of page.boxes) {
+      const text = normalizeArabicText(box.text);
       if (!text) continue;
-      const rtl = isRtlDominant(text);
+      const rtl = box.rtl || isRtlDominant(text);
+      const pos = pixelBoxToInches(box, page.width, page.height);
       slide.addText(text, {
-        x: 0.5,
-        y,
-        w: 7.5,
-        h: 0.45,
-        fontSize: 14,
+        x: pos.x,
+        y: pos.y,
+        w: pos.w,
+        h: pos.h,
+        fontSize: Math.round(pos.fontSize),
         align: rtl ? "right" : "left",
         rtlMode: rtl,
         fontFace: rtl ? "Arial" : "Calibri",
         wrap: true,
+        ...(scanned ? { color: "FFFFFF", transparency: 100 } : {}),
       });
-      y += 0.48;
     }
-    if (!lines.length) {
-      slide.addText(`Page ${i + 1}`, {
-        x: 0.5,
-        y: 4,
-        w: 7.5,
-        h: 0.5,
-        fontSize: 16,
-        align: "center",
-      });
+
+    if (!page.boxes.length) {
+      slide.addText(`Page ${i + 1}`, { x: 0.5, y: 4, w: 7.5, h: 0.5, fontSize: 16, align: "center" });
     }
   }
 
@@ -271,12 +257,31 @@ export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<
 
 async function extractOfficeText(file: File): Promise<string> {
   const ext = file.name.split(".").pop()?.toLowerCase();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes.byteLength < 4) return "";
+
   if (ext === "xlsx" || ext === "xls") {
     const XLSX = await loadXlsxModule();
-    const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+    const wb = XLSX.read(bytes, { type: "array" });
     return wb.SheetNames.map((n) => XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n\n");
   }
-  return (await file.text()).slice(0, 50000);
+
+  if (ext === "docx" || ext === "pptx") {
+    const { unzipOfficeXmlText } = await import("@/lib/pdf/office-text");
+    const xmlPath = ext === "docx" ? "word/document.xml" : "ppt/slides/slide1.xml";
+    const text = await unzipOfficeXmlText(bytes, xmlPath);
+    if (text) return text.slice(0, 50000);
+  }
+
+  if (ext === "doc" || ext === "ppt") {
+    return "";
+  }
+
+  try {
+    return new TextDecoder("utf-8", { fatal: false }).decode(bytes).slice(0, 50000);
+  } catch {
+    return "";
+  }
 }
 
 function loadImage(url: string): Promise<{ data: string; width: number; height: number }> {

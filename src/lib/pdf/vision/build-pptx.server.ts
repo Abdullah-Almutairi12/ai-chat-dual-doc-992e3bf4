@@ -1,10 +1,12 @@
 import { normalizeArabicText } from "@/lib/pdf/bidi";
+import { normLayoutToInches } from "@/lib/pdf/layout-fidelity";
 import {
   blockRtl,
   fontFor,
   layoutToInches,
   stripHexColor,
 } from "@/lib/pdf/vision/block-layout.server";
+import { sortBlocksByLayout } from "@/lib/pdf/vision/fusion.server";
 import {
   PORTRAIT_CONTENT_W,
   PORTRAIT_HEIGHT_IN,
@@ -16,14 +18,14 @@ import { legacySlideToBlocks } from "@/lib/pdf/vision/legacy-slide.server";
 import { finalizeOfficeBuffer } from "@/lib/pdf/vision/response.server";
 import type { VisionBlock, VisionChart, VisionPage, VisionSlide } from "@/lib/pdf/vision/schema";
 
-/** STRICT: this module must never embed raster page images — editable native content only. */
-const FORBID_PAGE_IMAGES = true as const;
-
-function assertNoImageEmbed(): void {
-  if (!FORBID_PAGE_IMAGES) {
-    throw new Error("Page image embedding is forbidden in Master Engine PPTX builder");
-  }
-}
+export type FidelityPageRender = {
+  pageNumber: number;
+  width: number;
+  height: number;
+  base64: string;
+  /** When false (scanned page), embed page image behind editable text. */
+  hasTextLayer: boolean;
+};
 
 function definePortraitLayout(pptx: import("pptxgenjs").default): void {
   pptx.defineLayout({
@@ -91,11 +93,13 @@ function renderBlockToSlide(
   pptx: import("pptxgenjs").default,
   block: VisionBlock,
   flowY: number,
+  scannedBackground: boolean,
 ): number {
-  assertNoImageEmbed();
   const rtl = blockRtl(block);
   const fontFace = fontFor(rtl);
-  const box = layoutToInches(block.layout, flowY);
+  const box = block.layout?.x != null && block.layout?.y != null
+    ? normLayoutToInches(block.layout)
+    : layoutToInches(block.layout, flowY);
   let nextY = box.usedFlowY ? box.y : box.y;
 
   switch (block.type) {
@@ -142,6 +146,7 @@ function renderBlockToSlide(
         align: rtl ? "right" : "left",
         rtlMode: rtl,
         fontFace,
+        ...(scannedBackground ? { color: "FFFFFF", transparency: 100 } : {}),
       });
       nextY = box.y + box.h + 0.1;
       break;
@@ -160,6 +165,7 @@ function renderBlockToSlide(
         rtlMode: rtl,
         fontFace,
         wrap: true,
+        ...(scannedBackground ? { color: "FFFFFF", transparency: 100 } : {}),
       });
       nextY = box.y + box.h + 0.08;
       break;
@@ -225,10 +231,11 @@ function pageToBlocks(page: VisionPage): VisionBlock[] {
   return [];
 }
 
-/** Build portrait-oriented editable PPTX from Master Engine page blocks — no raster images. */
-export async function buildPptxFromVisionPages(pages: VisionPage[]): Promise<Buffer> {
-  assertNoImageEmbed();
-
+/** Build portrait-oriented editable PPTX — Adobe-style layout fidelity. */
+export async function buildPptxFromVisionPages(
+  pages: VisionPage[],
+  renders?: FidelityPageRender[],
+): Promise<Buffer> {
   const pptxModule = await import("pptxgenjs");
   const PptxGenJS = pptxModule.default as typeof import("pptxgenjs").default;
   const pptx = new PptxGenJS();
@@ -236,7 +243,20 @@ export async function buildPptxFromVisionPages(pages: VisionPage[]): Promise<Buf
 
   for (const pageData of pages) {
     const slide = pptx.addSlide();
-    const blocks = pageToBlocks(pageData);
+    const render = renders?.find((r) => r.pageNumber === pageData.pageNumber);
+    const scannedBackground = render != null && !render.hasTextLayer;
+
+    if (render && scannedBackground) {
+      slide.addImage({
+        data: `image/png;base64,${render.base64}`,
+        x: 0,
+        y: 0,
+        w: PORTRAIT_WIDTH_IN,
+        h: PORTRAIT_HEIGHT_IN,
+      });
+    }
+
+    const blocks = sortBlocksByLayout(pageToBlocks(pageData));
     let flowY = 0.5;
 
     if (pageData.pageTitle) {
@@ -251,13 +271,14 @@ export async function buildPptxFromVisionPages(pages: VisionPage[]): Promise<Buf
         align: rtl ? "right" : "left",
         rtlMode: rtl,
         fontFace: fontFor(rtl),
+        ...(scannedBackground ? { color: "FFFFFF", transparency: 100 } : {}),
       });
       flowY += 0.75;
     }
 
     for (const block of blocks) {
-      if (flowY >= PORTRAIT_HEIGHT_IN - 0.5) break;
-      flowY = renderBlockToSlide(slide, pptx, block, flowY);
+      if (!block.layout?.y && flowY >= PORTRAIT_HEIGHT_IN - 0.5) break;
+      flowY = renderBlockToSlide(slide, pptx, block, flowY, scannedBackground);
     }
 
     if (!blocks.length && !pageData.pageTitle) {
@@ -284,7 +305,8 @@ export async function buildPptxFromVisionPages(pages: VisionPage[]): Promise<Buf
   }
 
   const out = await pptx.write({ outputType: "nodebuffer" });
-  return finalizeOfficeBuffer(Buffer.from(out as ArrayBuffer));
+  const raw = Buffer.isBuffer(out) ? out : Buffer.from(out as ArrayBuffer);
+  return finalizeOfficeBuffer(raw);
 }
 
 /** @deprecated Use buildPptxFromVisionPages — slides are converted to blocks internally. */

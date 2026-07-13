@@ -72,6 +72,7 @@ export function officeFileResponse(
       "Content-Length": String(body.byteLength),
       "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       "Cache-Control": "no-store, no-transform",
+      "Content-Encoding": "identity",
       "X-Content-Type-Options": "nosniff",
       "Accept-Ranges": "bytes",
       "x-vision-provider": meta.provider,

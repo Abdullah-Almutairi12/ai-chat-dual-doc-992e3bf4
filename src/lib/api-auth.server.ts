@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
+import { hydrateVercelProductionEnv } from "@/integrations/supabase/env.server";
 import type { Database } from "@/integrations/supabase/types";
 import {
   missingSupabasePublicEnv,
@@ -28,6 +29,13 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+export class ApiConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiConfigError";
+  }
+}
+
 export type RequestAuth = {
   supabase: ReturnType<typeof createClient<Database>>;
   userId: string;
@@ -36,10 +44,12 @@ export type RequestAuth = {
 
 /** Validate Bearer JWT on API routes (same rules as serverFn auth middleware). */
 export async function authenticateRequest(request: Request): Promise<RequestAuth> {
+  hydrateVercelProductionEnv();
+
   const SUPABASE_URL = resolveSupabaseUrl();
   const SUPABASE_PUBLISHABLE_KEY = resolveSupabasePublishableKey();
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    throw new Error(supabaseEnvError(missingSupabasePublicEnv()));
+    throw new ApiConfigError(supabaseEnvError(missingSupabasePublicEnv()));
   }
 
   const authHeader = request.headers.get("authorization");
@@ -83,4 +93,8 @@ export function jsonResponse(body: unknown, status = 200): Response {
 
 export function unauthorizedResponse(): Response {
   return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
+}
+
+export function configErrorResponse(err: ApiConfigError): Response {
+  return jsonResponse({ ok: false, error: err.message, code: "SERVER_NOT_CONFIGURED" }, 503);
 }
