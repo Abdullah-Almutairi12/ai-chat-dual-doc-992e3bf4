@@ -1,13 +1,20 @@
-const SITE_URL = "https://pdfquanta.online";
-const OG_IMAGE = `${SITE_URL}/og-image.jpg`;
+import { resolveAppOrigin } from "@/lib/app-origin";
+
+function siteUrl(): string {
+  return resolveAppOrigin();
+}
+
+function ogImage(): string {
+  return `${siteUrl()}/og-image.jpg`;
+}
 
 /**
  * Build a route head() config with title, description, Open Graph / Twitter
- * card tags, and a self-referencing canonical URL pointing at the HTTPS
- * custom domain. Use for shareable leaf routes.
+ * card tags, and a self-referencing canonical URL for the active domain.
  */
 export function pageHead(opts: { path: string; title: string; description: string }) {
-  const url = `${SITE_URL}${opts.path}`;
+  const url = `${siteUrl()}${opts.path}`;
+  const image = ogImage();
   return {
     meta: [
       { title: opts.title },
@@ -16,8 +23,8 @@ export function pageHead(opts: { path: string; title: string; description: strin
       { property: "og:description", content: opts.description },
       { property: "og:type", content: "website" },
       { property: "og:url", content: url },
-      { property: "og:image", content: OG_IMAGE },
-      { name: "twitter:image", content: OG_IMAGE },
+      { property: "og:image", content: image },
+      { name: "twitter:image", content: image },
     ],
     links: [{ rel: "canonical", href: url }],
   };

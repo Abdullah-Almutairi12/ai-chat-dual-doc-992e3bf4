@@ -10,18 +10,15 @@ import {
 import { loadPdfPipelineContext, extractVisionChunk } from "@/lib/pdf/vision/pipeline.server";
 import { VisionNotConfiguredError } from "@/lib/pdf/vision/convert.server";
 import { isMasterPdfTool, type MasterConvertTool } from "@/lib/pdf/vision/schema";
-import { isPdfBytes, MASTER_SERVER_PROCESS_LIMIT_BYTES } from "@/lib/pdf/vision/upload-limits";
-
-type ChunkBody = {
-  pdfBase64?: string;
-  tool?: string;
-  pageStart?: number;
-  pageEnd?: number;
-};
+import {
+  isPdfBytes,
+  MASTER_CLIENT_UPLOAD_LIMIT_BYTES,
+  MASTER_SERVER_PROCESS_LIMIT_BYTES,
+} from "@/lib/pdf/vision/upload-limits";
 
 /**
  * POST /api/pdf/convert-chunk
- * JSON: { pdfBase64, tool, pageStart, pageEnd } — in-memory only, no storage.
+ * Multipart: file (PDF), tool, pageStart, pageEnd — in-memory only, no storage.
  */
 export const Route = createFileRoute("/api/pdf/convert-chunk")({
   server: {
@@ -29,23 +26,26 @@ export const Route = createFileRoute("/api/pdf/convert-chunk")({
       POST: async ({ request }) => {
         try {
           await authenticateRequest(request);
-          const body = (await request.json().catch(() => ({}))) as ChunkBody;
+          const form = await request.formData();
 
-          const toolRaw = String(body.tool ?? "").trim();
+          const toolRaw = String(form.get("tool") ?? "").trim();
           if (!isMasterPdfTool(toolRaw)) {
             return jsonResponse({ ok: false, error: "Invalid tool" }, 400);
           }
           const tool = toolRaw as MasterConvertTool;
 
-          const pdfBase64 = String(body.pdfBase64 ?? "").trim();
-          if (!pdfBase64) {
-            return jsonResponse({ ok: false, error: "pdfBase64 required" }, 400);
+          const file = form.get("file");
+          if (!(file instanceof File) || file.size === 0) {
+            return jsonResponse({ ok: false, error: "PDF file required" }, 400);
+          }
+          if (file.size > MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
+            return jsonResponse({ ok: false, error: "File exceeds 4MB direct upload limit" }, 413);
           }
 
-          const pageStart = Math.max(1, Number(body.pageStart) || 1);
-          const pageEnd = Math.max(pageStart, Number(body.pageEnd) || pageStart);
+          const pageStart = Math.max(1, Number(form.get("pageStart")) || 1);
+          const pageEnd = Math.max(pageStart, Number(form.get("pageEnd")) || pageStart);
 
-          const pdfBytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
+          const pdfBytes = new Uint8Array(await file.arrayBuffer());
           if (pdfBytes.byteLength > MASTER_SERVER_PROCESS_LIMIT_BYTES) {
             return jsonResponse({ ok: false, error: "File exceeds 20MB limit" }, 413);
           }

@@ -21,7 +21,6 @@ import {
 import {
   MASTER_CLIENT_UPLOAD_LIMIT_BYTES,
   MASTER_FETCH_TIMEOUT_MS,
-  MASTER_SERVER_PROCESS_LIMIT_BYTES,
   masterSkipReason,
 } from "@/lib/pdf/vision/upload-limits";
 
@@ -50,22 +49,14 @@ async function countPdfPages(file: File): Promise<number> {
   }
 }
 
-async function fileToBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
-  return btoa(binary);
-}
-
 function shouldUseChunkedPipeline(file: File, pageCount: number): boolean {
-  return file.size > MASTER_CLIENT_UPLOAD_LIMIT_BYTES || pageCount > 3;
+  return file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES && pageCount > 3;
 }
 
-/** In-memory chunked Vision AI — sends PDF base64 per chunk, no storage. */
+/** In-memory chunked Vision AI — multipart upload per chunk, no storage. */
 async function convertViaChunkedPipeline(
   file: File,
   tool: MasterConvertTool,
-  pdfBase64: string,
   pageCount: number,
   token: string,
   onProgress?: (p: PdfProgress) => void,
@@ -84,13 +75,16 @@ async function convertViaChunkedPipeline(
       pageCount,
     });
 
+    const form = new FormData();
+    form.append("file", file);
+    form.append("tool", tool);
+    form.append("pageStart", String(start));
+    form.append("pageEnd", String(end));
+
     const res = await fetch("/api/pdf/convert-chunk", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ pdfBase64, tool, pageStart: start, pageEnd: end }),
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
     });
 
     const data = (await res.json().catch(() => ({}))) as {
@@ -205,7 +199,7 @@ export async function convertViaMasterEngine(
 ): Promise<{ blob: Blob; ext: string } | null> {
   const skip = masterSkipReason(file);
   if (skip === "empty_file") return null;
-  if (file.size > MASTER_SERVER_PROCESS_LIMIT_BYTES) return null;
+  if (file.size > MASTER_CLIENT_UPLOAD_LIMIT_BYTES) return null;
   if (!isSupabaseConfigured()) return null;
 
   try {
@@ -217,8 +211,7 @@ export async function convertViaMasterEngine(
 
     if (shouldUseChunkedPipeline(file, pageCount)) {
       onProgress?.({ stage: "master-prepare", percent: 6 });
-      const pdfBase64 = await fileToBase64(file);
-      return convertViaChunkedPipeline(file, tool, pdfBase64, pageCount, token, onProgress);
+      return convertViaChunkedPipeline(file, tool, pageCount, token, onProgress);
     }
 
     return convertViaDirectUpload(file, tool, token, onProgress);
@@ -236,7 +229,7 @@ export async function runMasterConversion(
   extra?: { imageFiles?: File[]; imageFormat?: "jpeg" | "png" },
   onProgress?: (p: PdfProgress) => void,
 ): Promise<{ blob?: Blob; blobs?: { name: string; blob: Blob }[]; ext: string; meta: MasterConversionMeta }> {
-  if (isMasterPdfTool(mode) && file.size <= MASTER_SERVER_PROCESS_LIMIT_BYTES) {
+  if (isMasterPdfTool(mode) && file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
     const master = await convertViaMasterEngine(file, mode, onProgress);
     if (master) {
       return { blob: master.blob, ext: master.ext, meta: { source: "master", usedFallback: false } };
@@ -246,14 +239,26 @@ export async function runMasterConversion(
     onProgress?.({ stage: "client-local", percent: 12 });
   }
 
-  const { runConversion } = await import("@/lib/pdf/convert");
-  const result = await runConversion(mode, file, extra, onProgress);
-  return {
-    ...result,
-    meta: {
-      source: "client",
-      usedFallback: isMasterPdfTool(mode),
-      skipReason: isMasterPdfTool(mode) ? masterSkipReason(file) ?? undefined : undefined,
-    },
-  };
+  try {
+    const { runConversion } = await import("@/lib/pdf/convert");
+    const result = await runConversion(mode, file, extra, onProgress);
+    return {
+      ...result,
+      meta: {
+        source: "client",
+        usedFallback: isMasterPdfTool(mode),
+        skipReason: isMasterPdfTool(mode) ? masterSkipReason(file) ?? undefined : undefined,
+      },
+    };
+  } catch (err) {
+    console.error("[master-engine] client conversion failed", err);
+    return {
+      ext: isMasterPdfTool(mode) ? extForMasterTool(mode) : "pdf",
+      meta: {
+        source: "client",
+        usedFallback: true,
+        skipReason: err instanceof Error ? err.message : "client_failed",
+      },
+    };
+  }
 }
