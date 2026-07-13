@@ -41,9 +41,11 @@ export type LayoutBox = {
 export type LayoutPage = {
   width: number;
   height: number;
-  /** JPEG data URL of the rendered page (the original visual design). */
+  /** JPEG data URL of the rendered page (empty for text-only pages when backdrop is skipped). */
   image: string;
   boxes: LayoutBox[];
+  /** True when the page had no extractable text layer and relied on OCR/image. */
+  isScanned: boolean;
 };
 
 export type LayoutResult = {
@@ -154,7 +156,11 @@ function boxesFromOcr(data: any): LayoutBox[] {
   return boxes;
 }
 
-export async function extractLayout(file: File, onProgress?: ProgressFn): Promise<LayoutResult> {
+export async function extractLayout(
+  file: File,
+  onProgress?: ProgressFn,
+  opts?: { backdrop?: "all" | "scanned-only" },
+): Promise<LayoutResult> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new Error("Layout extraction requires a browser environment");
   }
@@ -165,6 +171,8 @@ export async function extractLayout(file: File, onProgress?: ProgressFn): Promis
   const pdf = await pdfjs.getDocument({ data: buf }).promise;
   const pageCount = pdf.numPages;
 
+  const backdropMode = opts?.backdrop ?? "all";
+
   const pages: LayoutPage[] = [];
   const scannedIdx: number[] = [];
   let rtlVotes = 0;
@@ -174,18 +182,22 @@ export async function extractLayout(file: File, onProgress?: ProgressFn): Promis
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: RENDER_SCALE });
     const canvas = await renderCanvas(page, viewport);
-    const image = canvas.toDataURL("image/jpeg", 0.82);
 
     const content = await page.getTextContent();
     let raw = "";
     for (const item of content.items) if ("str" in item) raw += item.str + " ";
     const hasTextLayer = meaningfulLength(raw) >= MIN_TEXT_CHARS;
+    const isScanned = !hasTextLayer;
+    const image =
+      backdropMode === "all" || isScanned
+        ? canvas.toDataURL("image/jpeg", isScanned ? 0.72 : 0.82)
+        : "";
 
     const boxes = hasTextLayer ? boxesFromTextLayer(pdfjs, content, viewport) : [];
     if (!hasTextLayer) scannedIdx.push(i - 1);
     if (isRtlText(raw)) rtlVotes++;
 
-    pages.push({ width: canvas.width, height: canvas.height, image, boxes });
+    pages.push({ width: canvas.width, height: canvas.height, image, boxes, isScanned });
     onProgress?.({
       stage: "rendering",
       page: i,

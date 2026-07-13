@@ -113,6 +113,8 @@ export async function pdfToExcel(file: File, onProgress?: ProgressFn): Promise<B
 }
 
 /** PDF → PowerPoint — Adobe-style positioned editable text per page. */
+const MAX_CLIENT_PPT_PAGES = 30;
+
 export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Blob> {
   requireBrowser();
   const { extractLayout } = await import("@/lib/pdf-layout");
@@ -120,25 +122,32 @@ export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Bl
   const PptxGenJS = pptxModule.default as typeof import("pptxgenjs").default;
 
   onProgress?.({ stage: "layout", percent: 5 });
-  const layout = await extractLayout(file, (p) =>
-    onProgress?.({
-      stage: p.stage,
-      percent: 5 + Math.round(p.percent * 0.85),
-      page: p.page,
-      pageCount: p.pageCount,
-    }),
+  const layout = await extractLayout(
+    file,
+    (p) =>
+      onProgress?.({
+        stage: p.stage,
+        percent: 5 + Math.round(p.percent * 0.85),
+        page: p.page,
+        pageCount: p.pageCount,
+      }),
+    { backdrop: "scanned-only" },
   );
+
+  const pages = layout.pages.slice(0, MAX_CLIENT_PPT_PAGES);
+  if (!pages.length) {
+    throw new Error("No pages to export");
+  }
 
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "PDFQUANTA_PORTRAIT", width: 8.5, height: 11 });
   pptx.layout = "PDFQUANTA_PORTRAIT";
 
-  for (let i = 0; i < layout.pages.length; i++) {
-    const page = layout.pages[i];
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i]!;
     const slide = pptx.addSlide();
-    const scanned = layout.usedOcr && layout.ocrPageCount > 0 && page.boxes.length > 0;
 
-    if (scanned || page.image) {
+    if (page.isScanned && page.image) {
       slide.addImage({
         data: page.image,
         x: 0,
@@ -158,12 +167,12 @@ export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Bl
         y: pos.y,
         w: pos.w,
         h: pos.h,
-        fontSize: Math.round(pos.fontSize),
+        fontSize: Math.max(8, Math.round(pos.fontSize)),
         align: rtl ? "right" : "left",
         rtlMode: rtl,
         fontFace: rtl ? "Arial" : "Calibri",
         wrap: true,
-        ...(scanned ? { color: "FFFFFF", transparency: 100 } : {}),
+        ...(page.isScanned ? { color: "FFFFFF", transparency: 100 } : {}),
       });
     }
 
@@ -173,8 +182,16 @@ export async function pdfToPptx(file: File, onProgress?: ProgressFn): Promise<Bl
   }
 
   onProgress?.({ stage: "pack", percent: 95 });
-  const out = await pptx.write({ outputType: "blob" });
-  return out as Blob;
+  try {
+    const out = await pptx.write({ outputType: "blob" });
+    if (!(out instanceof Blob) || out.size < 512) {
+      throw new Error("PPTX pack produced empty output");
+    }
+    return out;
+  } catch (err) {
+    console.error("[pdfToPptx] pack failed", err);
+    throw err instanceof Error ? err : new Error("PPTX export failed");
+  }
 }
 
 /** PDF → JPG/PNG images. */
