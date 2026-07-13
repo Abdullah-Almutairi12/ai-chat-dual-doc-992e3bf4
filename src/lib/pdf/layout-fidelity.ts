@@ -18,6 +18,19 @@ export type PixelBox = {
   rtl: boolean;
 };
 
+/** US Letter page size in twips (1/20 pt). */
+export const DOCX_PAGE_W_TWIPS = 12240;
+export const DOCX_PAGE_H_TWIPS = 15840;
+
+export function layoutToDocxTwips(layout: { x?: number; y?: number; w?: number; h?: number }) {
+  return {
+    before: Math.round((layout.y ?? 0) * DOCX_PAGE_H_TWIPS),
+    left: Math.round((layout.x ?? 0) * DOCX_PAGE_W_TWIPS),
+    width: Math.round((layout.w ?? 1) * DOCX_PAGE_W_TWIPS),
+    height: Math.max(200, Math.round((layout.h ?? 0.05) * DOCX_PAGE_H_TWIPS)),
+  };
+}
+
 export function normLayoutToInches(layout: VisionLayout): { x: number; y: number; w: number; h: number } {
   const x = layout.x != null ? PORTRAIT_MARGIN_X + layout.x * PORTRAIT_CONTENT_W : PORTRAIT_MARGIN_X;
   const y = layout.y != null ? layout.y * PORTRAIT_HEIGHT_IN : 0.5;

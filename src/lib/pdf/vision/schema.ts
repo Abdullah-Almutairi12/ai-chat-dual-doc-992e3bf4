@@ -100,7 +100,8 @@ export const MAX_VISION_PAGES = 15;
 
 /** Must stay within Vercel serverless request body limits (~4.5MB). */
 export { VERCEL_SERVERLESS_BODY_LIMIT_BYTES as MAX_VISION_FILE_BYTES } from "@/lib/pdf/vision/upload-limits";
-export const VISION_RENDER_SCALE = 2.5;
+export const VISION_RENDER_SCALE = 3;
+export const VISION_CHUNK_PAGES = 2;
 
 export function isMasterPdfTool(mode: string): mode is MasterConvertTool {
   return MASTER_PDF_TOOLS.has(mode as MasterConvertTool);

@@ -6,5 +6,7 @@ export default defineConfig({
   compatibilityDate: "2024-11-01",
   routeRules: {
     "/api/pdf/convert-vision": { maxDuration: 60 },
+    "/api/pdf/convert-chunk": { maxDuration: 60 },
+    "/api/pdf/convert-build": { maxDuration: 60 },
   },
 });

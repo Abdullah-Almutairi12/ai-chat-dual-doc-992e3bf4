@@ -16,11 +16,12 @@ Core capabilities:
 - Charts as structured native data (categories, series, numeric values)
 - Color swatches and design blocks → type "shape" with fillColor hex and layout box
 
-Bilingual rules (Arabic + English):
-- Detect language per block; set rtl:true for Arabic-dominant blocks
-- Preserve exact spelling from the PDF — do not translate, summarize, or omit text
-- When PDF text-layer hints are provided, verify Arabic shaping and keep positions
-- English labels beside Arabic (e.g. "Hasiba AI" / "حاسبة AI") stay as separate blocks at their visual positions
+Bilingual rules (Arabic + English) — STRICT:
+- NEVER translate Arabic to English or English to Arabic
+- NEVER omit, summarize, paraphrase, or reorder visible text
+- NEVER corrupt RTL/LTR: Arabic blocks MUST have rtl:true; English blocks rtl:false
+- Preserve mixed lines exactly (e.g. "Hasiba AI" next to "حاسبة AI" as separate positioned blocks)
+- When text-layer hints are provided, output MUST include every hinted string at its hinted layout
 
 Output rules:
 - Return ONLY valid JSON — no markdown fences, no commentary

@@ -11,13 +11,21 @@ import {
 import type { PdfProgress } from "@/lib/pdf/progress";
 import { uploadFileViaApi } from "@/lib/pdf-storage";
 import { formatFromFileName } from "@/lib/pdf/validate-output";
+import type { FidelityPageRender } from "@/lib/pdf/vision/build-pptx.server";
+import {
+  extForMasterTool,
+  isMasterPdfTool,
+  MAX_VISION_PAGES,
+  VISION_CHUNK_PAGES,
+  type MasterConvertTool,
+  type VisionPage,
+} from "@/lib/pdf/vision/schema";
 import {
   MASTER_CLIENT_UPLOAD_LIMIT_BYTES,
   MASTER_FETCH_TIMEOUT_MS,
   MASTER_SERVER_PROCESS_LIMIT_BYTES,
   masterSkipReason,
 } from "@/lib/pdf/vision/upload-limits";
-import { extForMasterTool, isMasterPdfTool, type MasterConvertTool } from "@/lib/pdf/vision/schema";
 
 export type { MasterConvertTool };
 export { isMasterPdfTool };
@@ -33,9 +41,184 @@ export function isVisionConvertTool(mode: string): mode is MasterConvertTool {
   return isMasterPdfTool(mode);
 }
 
+async function countPdfPages(file: File): Promise<number> {
+  try {
+    const pdfjs = await import("pdfjs-dist");
+    const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+    const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    return Math.min(pdf.numPages, MAX_VISION_PAGES);
+  } catch {
+    return MAX_VISION_PAGES;
+  }
+}
+
+function shouldUseChunkedPipeline(file: File, pageCount: number): boolean {
+  return file.size > MASTER_CLIENT_UPLOAD_LIMIT_BYTES || pageCount > 3;
+}
+
+type StorageRef = { bucket: string; path: string };
+
+async function ensureStorageUpload(file: File, tool: MasterConvertTool): Promise<StorageRef | null> {
+  const uploaded = await uploadFileViaApi(file, {
+    bucket: STORAGE_BUCKETS.pdfTools,
+    toolId: tool.replace("pdf-", ""),
+  });
+  if (!uploaded) return null;
+  return { bucket: uploaded.bucket, path: uploaded.path };
+}
+
+/** Chunked async pipeline — Supabase storage + per-page Vision AI (no 8% freeze). */
+async function convertViaChunkedPipeline(
+  file: File,
+  tool: MasterConvertTool,
+  storage: StorageRef,
+  pageCount: number,
+  token: string,
+  onProgress?: (p: PdfProgress) => void,
+): Promise<{ blob: Blob; ext: string } | null> {
+  const allPages: VisionPage[] = [];
+  const allRenders: FidelityPageRender[] = [];
+  let provider = "openai";
+  let model = "";
+
+  for (let start = 1; start <= pageCount; start += VISION_CHUNK_PAGES) {
+    const end = Math.min(start + VISION_CHUNK_PAGES - 1, pageCount);
+    onProgress?.({
+      stage: "master-vision",
+      percent: 12 + Math.round(((start - 1) / pageCount) * 72),
+      page: start,
+      pageCount,
+    });
+
+    const res = await fetch("/api/pdf/convert-chunk", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        storageBucket: storage.bucket,
+        storagePath: storage.path,
+        tool,
+        pageStart: start,
+        pageEnd: end,
+      }),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      pages?: VisionPage[];
+      renders?: FidelityPageRender[];
+      provider?: string;
+      model?: string;
+      error?: string;
+    };
+
+    if (!res.ok || !data.ok || !data.pages?.length) {
+      console.info("[master-engine] chunk failed", start, end, data.error ?? res.status);
+      return null;
+    }
+
+    allPages.push(...data.pages);
+    if (data.renders?.length) allRenders.push(...data.renders);
+    provider = data.provider ?? provider;
+    model = data.model ?? model;
+  }
+
+  onProgress?.({ stage: "master-build", percent: 88, pageCount });
+
+  const buildRes = await fetch("/api/pdf/convert-build", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      tool,
+      fileName: file.name,
+      pages: allPages,
+      renders: allRenders,
+      provider,
+      model,
+    }),
+  });
+
+  if (!buildRes.ok) {
+    console.info("[master-engine] build failed", buildRes.status);
+    return null;
+  }
+
+  const contentType = buildRes.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) return null;
+
+  const ext = extForMasterTool(tool);
+  const buffer = await readBoundedArrayBuffer(buildRes, 32 * 1024 * 1024);
+  if (!buffer) return null;
+
+  const format = formatFromFileName(`output.${ext}`);
+  if (format === "docx" || format === "pptx" || format === "xlsx") {
+    if (!quickZipHeaderCheck(buffer)) return null;
+  }
+
+  const blob = await arrayBufferToValidatedBlob(buffer, mimeForToolExt(ext), format);
+  if (!blob) return null;
+
+  onProgress?.({ stage: "done", percent: 100 });
+  return { blob, ext };
+}
+
+/** Direct upload for small PDFs (≤4MB, ≤3 pages). */
+async function convertViaDirectUpload(
+  file: File,
+  tool: MasterConvertTool,
+  token: string,
+  onProgress?: (p: PdfProgress) => void,
+): Promise<{ blob: Blob; ext: string } | null> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("tool", tool);
+
+  onProgress?.({ stage: "master-upload", percent: 8 });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MASTER_FETCH_TIMEOUT_MS);
+  const stopHeartbeat = startProgressHeartbeat(onProgress, "master-upload", 8, 45, MASTER_FETCH_TIMEOUT_MS - 2000);
+
+  try {
+    const res = await fetch("/api/pdf/convert-vision", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      signal: controller.signal,
+    });
+    stopHeartbeat();
+
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) return null;
+
+    onProgress?.({ stage: "master-download", percent: 88 });
+    const ext = extForMasterTool(tool);
+    const buffer = await readBoundedArrayBuffer(res, 32 * 1024 * 1024);
+    if (!buffer) return null;
+
+    const format = formatFromFileName(`output.${ext}`);
+    if ((format === "docx" || format === "pptx" || format === "xlsx") && !quickZipHeaderCheck(buffer)) return null;
+
+    const blob = await arrayBufferToValidatedBlob(buffer, mimeForToolExt(ext), format);
+    if (!blob) return null;
+
+    onProgress?.({ stage: "done", percent: 100 });
+    return { blob, ext };
+  } finally {
+    stopHeartbeat();
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Attempt server-side Master Engine conversion (direct upload or Supabase storage for large PDFs).
- * Returns null when server path is unsuitable so caller uses the client engine.
+ * Server-side Master Engine — Adobe-style AI extraction with layout fidelity.
  */
 export async function convertViaMasterEngine(
   file: File,
@@ -43,50 +226,40 @@ export async function convertViaMasterEngine(
   onProgress?: (p: PdfProgress) => void,
 ): Promise<{ blob: Blob; ext: string } | null> {
   const skip = masterSkipReason(file);
-  if (skip === "empty_file") {
-    console.info("[master-engine] skipping server path:", skip);
-    return null;
-  }
-  if (file.size > MASTER_SERVER_PROCESS_LIMIT_BYTES) {
-    console.info("[master-engine] file exceeds server process limit");
-    return null;
-  }
-
-  if (!isSupabaseConfigured()) {
-    console.info("[master-engine] supabase not configured — using client engine");
-    return null;
-  }
+  if (skip === "empty_file") return null;
+  if (file.size > MASTER_SERVER_PROCESS_LIMIT_BYTES) return null;
+  if (!isSupabaseConfigured()) return null;
 
   try {
     const { data: session } = await supabase.auth.getSession();
     const token = session.session?.access_token;
-    if (!token) {
-      console.info("[master-engine] no session — using client engine");
-      return null;
+    if (!token) return null;
+
+    const pageCount = await countPdfPages(file);
+    const useChunked = shouldUseChunkedPipeline(file, pageCount);
+
+    if (useChunked) {
+      onProgress?.({ stage: "master-storage", percent: 6 });
+      const storage = await ensureStorageUpload(file, tool);
+      if (!storage) return null;
+      return convertViaChunkedPipeline(file, tool, storage, pageCount, token, onProgress);
     }
+
+    if (file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
+      return convertViaDirectUpload(file, tool, token, onProgress);
+    }
+
+    onProgress?.({ stage: "master-storage", percent: 6 });
+    const storage = await ensureStorageUpload(file, tool);
+    if (!storage) return null;
 
     const form = new FormData();
     form.append("tool", tool);
+    form.append("storageBucket", storage.bucket);
+    form.append("storagePath", storage.path);
+    form.append("fileName", file.name);
 
     onProgress?.({ stage: "master-upload", percent: 8 });
-
-    if (file.size > MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
-      onProgress?.({ stage: "master-storage", percent: 10 });
-      const uploaded = await uploadFileViaApi(file, {
-        bucket: STORAGE_BUCKETS.pdfTools,
-        toolId: tool.replace("pdf-", ""),
-      });
-      if (!uploaded) {
-        console.info("[master-engine] storage upload failed — using client engine");
-        return null;
-      }
-      form.append("storageBucket", uploaded.bucket);
-      form.append("storagePath", uploaded.path);
-      form.append("fileName", file.name);
-    } else {
-      form.append("file", file);
-    }
-
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), MASTER_FETCH_TIMEOUT_MS);
     const stopHeartbeat = startProgressHeartbeat(onProgress, "master-upload", 8, 45, MASTER_FETCH_TIMEOUT_MS - 2000);
@@ -98,45 +271,18 @@ export async function convertViaMasterEngine(
         body: form,
         signal: controller.signal,
       });
-
       stopHeartbeat();
-
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        console.info("[master-engine] server error, using client engine", res.status, detail.slice(0, 200));
-        return null;
-      }
-
+      if (!res.ok) return null;
       const contentType = res.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) {
-        console.info("[master-engine] JSON response instead of binary — using client engine");
-        return null;
-      }
-
+      if (contentType.includes("application/json")) return null;
       onProgress?.({ stage: "master-download", percent: 88 });
-
       const ext = extForMasterTool(tool);
-      const maxBytes = 32 * 1024 * 1024;
-      const buffer = await readBoundedArrayBuffer(res, maxBytes);
-      if (!buffer) {
-        console.info("[master-engine] empty/oversized response — using client engine");
-        return null;
-      }
-
+      const buffer = await readBoundedArrayBuffer(res, 32 * 1024 * 1024);
+      if (!buffer) return null;
       const format = formatFromFileName(`output.${ext}`);
-      if (format === "docx" || format === "pptx" || format === "xlsx") {
-        if (!quickZipHeaderCheck(buffer)) {
-          console.info("[master-engine] corrupt ZIP header — using client engine");
-          return null;
-        }
-      }
-
+      if ((format === "docx" || format === "pptx" || format === "xlsx") && !quickZipHeaderCheck(buffer)) return null;
       const blob = await arrayBufferToValidatedBlob(buffer, mimeForToolExt(ext), format);
-      if (!blob) {
-        console.info("[master-engine] output failed validation — using client engine");
-        return null;
-      }
-
+      if (!blob) return null;
       onProgress?.({ stage: "done", percent: 100 });
       return { blob, ext };
     } finally {
@@ -144,11 +290,7 @@ export async function convertViaMasterEngine(
       clearTimeout(timer);
     }
   } catch (err) {
-    const aborted = err instanceof Error && err.name === "AbortError";
-    console.info(
-      "[master-engine] error, using client engine",
-      aborted ? "timeout" : err instanceof Error ? err.message : err,
-    );
+    console.info("[master-engine] error", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -156,9 +298,6 @@ export async function convertViaMasterEngine(
 /** @deprecated Use convertViaMasterEngine */
 export const convertViaVisionApi = convertViaMasterEngine;
 
-/**
- * Universal conversion: Master Engine (server AI) when eligible → Adobe-style client fallback.
- */
 export async function runMasterConversion(
   mode: string,
   file: File,

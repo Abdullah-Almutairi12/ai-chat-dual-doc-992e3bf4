@@ -100,7 +100,7 @@ function renderBlockToSlide(
   const box = block.layout?.x != null && block.layout?.y != null
     ? normLayoutToInches(block.layout)
     : layoutToInches(block.layout, flowY);
-  let nextY = box.usedFlowY ? box.y : box.y;
+  let nextY = box.y;
 
   switch (block.type) {
     case "shape": {

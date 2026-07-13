@@ -1,18 +1,10 @@
 import { normalizeArabicText } from "@/lib/pdf/bidi";
+import { layoutToDocxTwips } from "@/lib/pdf/layout-fidelity";
 import { blockRtl, fontFor, stripHexColor } from "@/lib/pdf/vision/block-layout.server";
 import { sortBlocksByLayout } from "@/lib/pdf/vision/fusion.server";
 import type { FidelityPageRender } from "@/lib/pdf/vision/build-pptx.server";
 import { finalizeOfficeBuffer } from "@/lib/pdf/vision/response.server";
 import type { VisionBlock, VisionChart, VisionPage } from "@/lib/pdf/vision/schema";
-
-/** STRICT: this module must never embed raster page images — editable native content only. */
-const FORBID_PAGE_IMAGES = true as const;
-
-function assertNoImageEmbed(): void {
-  if (!FORBID_PAGE_IMAGES) {
-    throw new Error("Page image embedding is forbidden in Master Engine DOCX builder");
-  }
-}
 
 function chartToTableRows(chart: VisionChart): string[][] {
   const rows: string[][] = [];
@@ -42,10 +34,10 @@ function defaultFontSize(block: VisionBlock): number {
   }
 }
 
-/** Build portrait-oriented editable DOCX with layout-aware spacing. */
+/** Build portrait DOCX with absolute-position paragraphs (Adobe-style). */
 export async function buildDocxFromVisionPages(
   pages: VisionPage[],
-  _renders?: FidelityPageRender[],
+  renders?: FidelityPageRender[],
 ): Promise<Buffer> {
 
   const {
@@ -65,28 +57,26 @@ export async function buildDocxFromVisionPages(
   } = await import("docx");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const children: any[] = [];
+  const sections: any[] = [];
 
   for (let i = 0; i < pages.length; i++) {
+    const render = renders?.find((r) => r.pageNumber === pages[i].pageNumber);
+    const scanned = render != null && !render.hasTextLayer;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const children: any[] = [];
+
     if (pages[i].pageTitle) {
       const title = normalizeArabicText(pages[i].pageTitle!);
       const rtl = blockRtl({ type: "heading", text: title });
       children.push(
         new Paragraph({
-          heading: HeadingLevel.HEADING_2,
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
           bidirectional: rtl,
-          children: [
-            new TextRun({
-              text: title,
-              rightToLeft: rtl,
-              font: fontFor(rtl),
-              bold: true,
-            }),
-          ],
+          children: [new TextRun({ text: title, rightToLeft: rtl, font: fontFor(rtl), bold: true, size: 36 })],
         }),
       );
     }
+
     for (const block of sortBlocksByLayout(pages[i].blocks)) {
       children.push(
         ...blockToDocxElements(block, {
@@ -99,35 +89,26 @@ export async function buildDocxFromVisionPages(
           TableCell,
           WidthType,
           ShadingType,
-        }),
+        }, scanned),
       );
     }
-    if (i < pages.length - 1) {
-      children.push(new Paragraph({ children: [new PageBreak()] }));
+
+    if (!children.length) {
+      children.push(new Paragraph({ children: [new TextRun({ text: " " })] }));
     }
-  }
 
-  if (!children.length) {
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: "PDF Quanta" })],
-      }),
-    );
-  }
-
-  const doc = new Document({
-    sections: [
-      {
-        properties: {
-          page: {
-            size: { orientation: PageOrientation.PORTRAIT, width: 12240, height: 15840 },
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
-          },
+    sections.push({
+      properties: {
+        page: {
+          size: { orientation: PageOrientation.PORTRAIT, width: 12240, height: 15840 },
+          margin: { top: 720, right: 720, bottom: 720, left: 720 },
         },
-        children,
       },
-    ],
-  });
+      children,
+    });
+  }
+
+  const doc = new Document({ sections });
   return finalizeOfficeBuffer(await Packer.toBuffer(doc));
 }
 
@@ -145,11 +126,21 @@ function blockToDocxElements(
     | "WidthType"
     | "ShadingType"
   >,
+  scannedBackground = false,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any[] {
-  assertNoImageEmbed();
   const { Paragraph, TextRun, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType, ShadingType } =
     docx;
+
+  const pos = block.layout ? layoutToDocxTwips(block.layout) : null;
+  const positionProps = pos
+    ? {
+        spacing: { before: pos.before, after: 40, line: 240 },
+        indent: blockRtl(block)
+          ? { right: pos.left, left: 0 }
+          : { left: pos.left },
+      }
+    : { spacing: { after: 80 } };
 
   if (block.type === "chart") {
     const rows = chartToTableRows(block);
@@ -165,13 +156,10 @@ function blockToDocxElements(
       const sizeHalfPoints = defaultFontSize(block);
       return [
         new Paragraph({
+          ...positionProps,
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.CENTER,
           bidirectional: rtl,
-          spacing: { before: 80, after: 80 },
-          shading: fill
-            ? { fill, type: ShadingType.CLEAR, color: "auto" }
-            : undefined,
-          indent: block.layout?.x != null ? { left: Math.round(block.layout.x * 7200) } : undefined,
+          shading: fill ? { fill, type: ShadingType.CLEAR, color: "auto" } : undefined,
           children: [
             new TextRun({
               text: label,
@@ -179,6 +167,7 @@ function blockToDocxElements(
               font: fontFor(rtl),
               size: sizeHalfPoints,
               bold: block.bold ?? false,
+              color: scannedBackground ? "FFFFFF" : undefined,
             }),
           ],
         }),
@@ -193,6 +182,7 @@ function blockToDocxElements(
         level === 1 ? HeadingLevel.HEADING_1 : level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
       return [
         new Paragraph({
+          ...positionProps,
           heading,
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
           bidirectional: rtl,
@@ -214,6 +204,7 @@ function blockToDocxElements(
       const rtl = blockRtl(block);
       return [
         new Paragraph({
+          ...positionProps,
           alignment: rtl ? AlignmentType.RIGHT : AlignmentType.LEFT,
           bidirectional: rtl,
           children: [
@@ -223,6 +214,7 @@ function blockToDocxElements(
               font: fontFor(rtl),
               size: defaultFontSize(block),
               bold: block.bold ?? false,
+              color: scannedBackground ? "FFFFFF" : undefined,
             }),
           ],
         }),

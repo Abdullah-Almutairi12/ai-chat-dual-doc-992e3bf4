@@ -35,6 +35,8 @@ import { Route as ApiPublicSendWelcomeRouteImport } from './routes/api/public/se
 import { Route as ApiPublicBillingHealthRouteImport } from './routes/api/public/billing-health'
 import { Route as ApiPdfUploadRouteImport } from './routes/api/pdf/upload'
 import { Route as ApiPdfConvertVisionRouteImport } from './routes/api/pdf/convert-vision'
+import { Route as ApiPdfConvertChunkRouteImport } from './routes/api/pdf/convert-chunk'
+import { Route as ApiPdfConvertBuildRouteImport } from './routes/api/pdf/convert-build'
 import { Route as ApiPdfConsumeRouteImport } from './routes/api/pdf/consume'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
@@ -170,6 +172,16 @@ const ApiPdfConvertVisionRoute = ApiPdfConvertVisionRouteImport.update({
   path: '/api/pdf/convert-vision',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPdfConvertChunkRoute = ApiPdfConvertChunkRouteImport.update({
+  id: '/api/pdf/convert-chunk',
+  path: '/api/pdf/convert-chunk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPdfConvertBuildRoute = ApiPdfConvertBuildRouteImport.update({
+  id: '/api/pdf/convert-build',
+  path: '/api/pdf/convert-build',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPdfConsumeRoute = ApiPdfConsumeRouteImport.update({
   id: '/api/pdf/consume',
   path: '/api/pdf/consume',
@@ -227,6 +239,8 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/pdf/consume': typeof ApiPdfConsumeRoute
+  '/api/pdf/convert-build': typeof ApiPdfConvertBuildRoute
+  '/api/pdf/convert-chunk': typeof ApiPdfConvertChunkRoute
   '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
   '/api/pdf/upload': typeof ApiPdfUploadRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
@@ -257,6 +271,8 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/pdf/consume': typeof ApiPdfConsumeRoute
+  '/api/pdf/convert-build': typeof ApiPdfConvertBuildRoute
+  '/api/pdf/convert-chunk': typeof ApiPdfConvertChunkRoute
   '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
   '/api/pdf/upload': typeof ApiPdfUploadRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
@@ -292,6 +308,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/pdf/consume': typeof ApiPdfConsumeRoute
+  '/api/pdf/convert-build': typeof ApiPdfConvertBuildRoute
+  '/api/pdf/convert-chunk': typeof ApiPdfConvertChunkRoute
   '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
   '/api/pdf/upload': typeof ApiPdfUploadRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
@@ -326,6 +344,8 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/api/pdf/consume'
+    | '/api/pdf/convert-build'
+    | '/api/pdf/convert-chunk'
     | '/api/pdf/convert-vision'
     | '/api/pdf/upload'
     | '/api/public/billing-health'
@@ -356,6 +376,8 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/api/pdf/consume'
+    | '/api/pdf/convert-build'
+    | '/api/pdf/convert-chunk'
     | '/api/pdf/convert-vision'
     | '/api/pdf/upload'
     | '/api/public/billing-health'
@@ -390,6 +412,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
     | '/api/pdf/consume'
+    | '/api/pdf/convert-build'
+    | '/api/pdf/convert-chunk'
     | '/api/pdf/convert-vision'
     | '/api/pdf/upload'
     | '/api/public/billing-health'
@@ -412,6 +436,8 @@ export interface RootRouteChildren {
   PaymentCallbackRoute: typeof PaymentCallbackRoute
   PaymentMockRoute: typeof PaymentMockRoute
   ApiPdfConsumeRoute: typeof ApiPdfConsumeRoute
+  ApiPdfConvertBuildRoute: typeof ApiPdfConvertBuildRoute
+  ApiPdfConvertChunkRoute: typeof ApiPdfConvertChunkRoute
   ApiPdfConvertVisionRoute: typeof ApiPdfConvertVisionRoute
   ApiPdfUploadRoute: typeof ApiPdfUploadRoute
   ApiPublicBillingHealthRoute: typeof ApiPublicBillingHealthRoute
@@ -604,6 +630,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPdfConvertVisionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pdf/convert-chunk': {
+      id: '/api/pdf/convert-chunk'
+      path: '/api/pdf/convert-chunk'
+      fullPath: '/api/pdf/convert-chunk'
+      preLoaderRoute: typeof ApiPdfConvertChunkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pdf/convert-build': {
+      id: '/api/pdf/convert-build'
+      path: '/api/pdf/convert-build'
+      fullPath: '/api/pdf/convert-build'
+      preLoaderRoute: typeof ApiPdfConvertBuildRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/pdf/consume': {
       id: '/api/pdf/consume'
       path: '/api/pdf/consume'
@@ -727,6 +767,8 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentCallbackRoute: PaymentCallbackRoute,
   PaymentMockRoute: PaymentMockRoute,
   ApiPdfConsumeRoute: ApiPdfConsumeRoute,
+  ApiPdfConvertBuildRoute: ApiPdfConvertBuildRoute,
+  ApiPdfConvertChunkRoute: ApiPdfConvertChunkRoute,
   ApiPdfConvertVisionRoute: ApiPdfConvertVisionRoute,
   ApiPdfUploadRoute: ApiPdfUploadRoute,
   ApiPublicBillingHealthRoute: ApiPublicBillingHealthRoute,
