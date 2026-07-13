@@ -26,7 +26,7 @@ async function hasActiveSubscription(
 /**
  * POST /api/pdf/consume
  * JSON: { fileName, fileSize, tool }
- * Reserves one processing slot and logs to the documents table.
+ * Reserves one processing slot (no file/document persistence).
  */
 export const Route = createFileRoute("/api/pdf/consume")({
   server: {
@@ -67,16 +67,6 @@ export const Route = createFileRoute("/api/pdf/consume")({
             } else {
               allowed = ok === true;
             }
-          }
-
-          if (allowed) {
-            await supabase.from("documents").insert({
-              user_id: userId,
-              user_email: email,
-              file_name: fileName,
-              file_size: fileSize,
-              tool_used: tool,
-            });
           }
 
           const filesProcessed = await readFilesProcessed(supabase, userId);

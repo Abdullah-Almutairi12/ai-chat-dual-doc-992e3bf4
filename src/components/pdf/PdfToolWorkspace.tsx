@@ -9,13 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
-import { STORAGE_BUCKETS } from "@/integrations/supabase/storage-buckets";
 import { useI18n } from "@/lib/i18n";
 import { getPdfTool, type PdfTool } from "@/lib/pdf-tools";
 import { sanitizeFileName, validateUpload, type UploadKind } from "@/lib/pdf/security";
 import { useEntitlement } from "@/lib/entitlement";
-import { addDocument } from "@/lib/documents";
-import { consumeProcessingSlot, persistProcessedFile, uploadFileViaApi } from "@/lib/pdf-storage";
+import { consumeProcessingSlot } from "@/lib/pdf-storage";
 import { runMasterConversion } from "@/lib/pdf/master-engine-client";
 import { validateBatchSize } from "@/lib/pdf/batch";
 import type { PdfProgress } from "@/lib/pdf/progress";
@@ -28,7 +26,7 @@ export function PdfToolWorkspace({ toolId }: Props) {
   const { t, dir } = useI18n();
   const navigate = useNavigate();
   const { user, isReady: authReady } = useAuth();
-  const { tryConsume, openUpgrade, entitlement, loading, refresh: refreshEntitlement } = useEntitlement();
+  const { openUpgrade, entitlement, loading, refresh: refreshEntitlement } = useEntitlement();
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<
@@ -113,73 +111,20 @@ export function PdfToolWorkspace({ toolId }: Props) {
     }
   };
 
-  const reserveSlot = useCallback(
-    async (batch: File[]): Promise<boolean> => {
-      if (!user) {
-        toast.error(t("pdf_need_login"));
-        navigate({ to: "/login", search: { redirect: `/tools/${toolId}` } });
-        return false;
-      }
-
-      if (!loading && entitlement && !entitlement.allowed) {
-        openUpgrade();
-        return false;
-      }
-
-      const meta = {
+  /** Non-blocking entitlement ping — never blocks conversion or persists files. */
+  const pingEntitlement = useCallback(
+    (batch: File[]) => {
+      if (!user) return;
+      void consumeProcessingSlot({
         fileName: batch[0]?.name,
         fileSize: batch[0]?.size,
         tool: toolId,
-      };
-
-      const viaApi = await consumeProcessingSlot(meta);
-      if (viaApi.ok) {
-        if (!viaApi.allowed) {
-          openUpgrade();
-          void refreshEntitlement();
-          return false;
-        }
-        void refreshEntitlement();
-        if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
-        return true;
-      }
-
-      console.warn("[PdfToolWorkspace] consume API failed", viaApi.error);
-      const ok = await tryConsume(meta);
-      if (ok) {
-        if (batch[0]) addDocument(batch[0].name, Math.round(batch[0].size / 1024), toolId);
-        return true;
-      }
-
-      if (!loading && entitlement && !entitlement.allowed) {
-        return false;
-      }
-
-      // Reservation failed but user still has allowance — proceed with processing.
-      return true;
+      })
+        .then(() => refreshEntitlement())
+        .catch(() => {});
     },
-    [user, loading, entitlement, toolId, t, navigate, openUpgrade, tryConsume, refreshEntitlement],
+    [user, toolId, refreshEntitlement],
   );
-
-  const persistUploads = (batch: File[], output?: { blob: Blob; name: string }) => {
-    if (!user) return;
-    void (async () => {
-      try {
-        for (const f of batch) {
-          await uploadFileViaApi(f, { bucket: STORAGE_BUCKETS.pdfTools, toolId });
-        }
-        if (output) {
-          await persistProcessedFile(user.id, output.blob, {
-            bucket: STORAGE_BUCKETS.documents,
-            toolId,
-            fileName: output.name,
-          });
-        }
-      } catch (err) {
-        console.warn("[PdfToolWorkspace] background upload failed", err);
-      }
-    })();
-  };
 
   const run = useCallback(
     async (batchOverride?: File[]) => {
@@ -212,9 +157,12 @@ export function PdfToolWorkspace({ toolId }: Props) {
           return;
         }
 
-        if (!(await reserveSlot(batch))) {
+        if (!loading && entitlement && !entitlement.allowed) {
+          openUpgrade();
           return;
         }
+
+        pingEntitlement(batch);
 
         const base = sanitizeFileName(batch[0].name.replace(/\.\w+$/i, ""));
         const pdf = await import("@/lib/pdf/client-api");
@@ -231,10 +179,8 @@ export function PdfToolWorkspace({ toolId }: Props) {
           if (applied?.kind === "single") {
             setResultBlob(applied.blob);
             setResultName(applied.fileName);
-            persistUploads(batch, { blob: applied.blob, name: applied.fileName });
             toast.success(t("convert_done"));
           } else if (applied?.kind === "multi") {
-            persistUploads(batch);
             if (applied.downloaded > 0) {
               toast.success(t("convert_done"));
             } else {
@@ -272,7 +218,6 @@ export function PdfToolWorkspace({ toolId }: Props) {
           for (const [i, part] of parts.entries()) {
             if (await pdf.validatedDownloadBlob(part, `${base}-part-${i + 1}.pdf`)) downloaded++;
           }
-          persistUploads(batch);
           if (downloaded > 0) toast.success(t("convert_done"));
           else {
             setProcessError(t("pdf_output_invalid"));
@@ -396,7 +341,6 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
         setResultBlob(valid);
         setResultName(outName);
-        persistUploads(batch, { blob: valid, name: outName });
         toast.success(t("convert_done"));
     } catch (err) {
       if (runIdRef.current === runId) {
@@ -421,11 +365,10 @@ export function PdfToolWorkspace({ toolId }: Props) {
       navigate,
       entitlement,
       loading,
-      tryConsume,
       openUpgrade,
       refreshEntitlement,
       reportProgress,
-      reserveSlot,
+      pingEntitlement,
       wmText,
       wmOpacity,
       wmRotation,

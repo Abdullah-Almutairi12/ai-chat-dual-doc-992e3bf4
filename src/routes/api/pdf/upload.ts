@@ -1,80 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import {
-  authenticateRequest,
-  configErrorResponse,
-  jsonResponse,
-  unauthorizedResponse,
-  ApiConfigError,
-} from "@/lib/api-auth.server";
-import {
-  buildStorageObjectPath,
-  bucketForPdfTool,
-  STORAGE_BUCKETS,
-  type StorageBucketId,
-} from "@/integrations/supabase/storage-buckets";
-import { MAX_FILE_BYTES } from "@/lib/pdf/security";
+import { authenticateRequest, jsonResponse, unauthorizedResponse, ApiConfigError, configErrorResponse } from "@/lib/api-auth.server";
 
-const ALLOWED_BUCKETS = new Set<string>(Object.values(STORAGE_BUCKETS));
-
-/**
- * POST /api/pdf/upload
- * Multipart: file (required), bucket (files|documents|pdf-tools), toolId (optional)
- * Stores under `{userId}/{timestamp}-{filename}` in the requested bucket.
- */
+/** File storage disabled — all processing is in-memory. */
 export const Route = createFileRoute("/api/pdf/upload")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { supabase, userId } = await authenticateRequest(request);
-          const form = await request.formData();
-          const file = form.get("file");
-          if (!(file instanceof File) || file.size === 0) {
-            return jsonResponse({ ok: false, error: "No file provided" }, 400);
-          }
-          if (file.size > MAX_FILE_BYTES) {
-            return jsonResponse(
-              { ok: false, error: `File exceeds ${MAX_FILE_BYTES / (1024 * 1024)}MB limit`, code: "FILE_TOO_LARGE" },
-              413,
-            );
-          }
-
-          const bucketRaw = String(form.get("bucket") ?? "").trim();
-          const toolId = String(form.get("toolId") ?? "").trim();
-          let bucket: StorageBucketId = STORAGE_BUCKETS.files;
-          if (bucketRaw && ALLOWED_BUCKETS.has(bucketRaw)) {
-            bucket = bucketRaw as StorageBucketId;
-          } else if (toolId) {
-            bucket = bucketForPdfTool(toolId);
-          }
-
-          const objectPath = buildStorageObjectPath(userId, file.name);
-          const { error } = await supabase.storage.from(bucket).upload(objectPath, file, {
-            upsert: false,
-            contentType: file.type || undefined,
-          });
-          if (error) {
-            console.error("[api/pdf/upload]", bucket, error.message);
-            return jsonResponse({ ok: false, error: error.message }, 500);
-          }
-
-          return jsonResponse({
-            ok: true,
-            bucket,
-            path: objectPath,
-            fileName: file.name,
-            size: file.size,
-          });
+          await authenticateRequest(request);
+          return jsonResponse(
+            { ok: false, error: "File storage is disabled. Process files in-memory only.", code: "STORAGE_DISABLED" },
+            410,
+          );
         } catch (err) {
-          if (err instanceof ApiConfigError) {
-            return configErrorResponse(err);
-          }
-          if (err instanceof Error && err.message === "Unauthorized") {
-            return unauthorizedResponse();
-          }
-          console.error("[api/pdf/upload]", err);
-          return jsonResponse({ ok: false, error: "Upload failed" }, 500);
+          if (err instanceof ApiConfigError) return configErrorResponse(err);
+          if (err instanceof Error && err.message === "Unauthorized") return unauthorizedResponse();
+          return jsonResponse({ ok: false, error: "Upload disabled" }, 410);
         }
       },
     },

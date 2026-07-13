@@ -4,8 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import {
 
-  FileText,
-
   LayoutDashboard,
 
   LogIn,
@@ -16,13 +14,9 @@ import {
 
   Sparkles,
 
-  Trash2,
-
   Wrench,
 
 } from "lucide-react";
-
-import { useEffect, useState } from "react";
 
 
 
@@ -38,15 +32,13 @@ import { useI18n } from "@/lib/i18n";
 
 import { tools } from "@/lib/tools";
 
-import { deleteDocument, getDocuments, type PdfDocument } from "@/lib/documents";
-
 import { supabase } from "@/integrations/supabase/client";
 
 
 
 export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   const { user, isReady, isAuthenticated } = useAuth();
 
@@ -55,22 +47,6 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const queryClient = useQueryClient();
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  const [docs, setDocs] = useState<PdfDocument[]>([]);
-
-
-
-  useEffect(() => {
-
-    const refresh = () => setDocs(getDocuments());
-
-    refresh();
-
-    window.addEventListener("pdfquanta-docs-changed", refresh);
-
-    return () => window.removeEventListener("pdfquanta-docs-changed", refresh);
-
-  }, []);
 
 
 
@@ -175,74 +151,6 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </Link>
 
         ))}
-
-
-
-        <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/50">
-
-          {t("history_title")}
-
-        </p>
-
-        {docs.length === 0 ? (
-
-          <p className="px-3 py-2 text-sm text-sidebar-foreground/50">{t("history_empty")}</p>
-
-        ) : (
-
-          <ul className="space-y-0.5">
-
-            {docs.slice(0, 8).map((doc) => (
-
-              <li
-
-                key={doc.id}
-
-                className="group flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50"
-
-              >
-
-                <FileText className="h-4 w-4 shrink-0 text-primary/70" />
-
-                <span className="min-w-0 flex-1">
-
-                  <span className="block truncate">{doc.name}</span>
-
-                  <span className="block text-xs text-sidebar-foreground/40">
-
-                    {new Date(doc.uploadedAt).toLocaleDateString(lang === "ar" ? "ar" : "en", {
-
-                      month: "short",
-
-                      day: "numeric",
-
-                    })}
-
-                  </span>
-
-                </span>
-
-                <button
-
-                  onClick={() => deleteDocument(doc.id)}
-
-                  className="shrink-0 text-sidebar-foreground/40 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-
-                  aria-label="delete"
-
-                >
-
-                  <Trash2 className="h-3.5 w-3.5" />
-
-                </button>
-
-              </li>
-
-            ))}
-
-          </ul>
-
-        )}
 
       </nav>
 

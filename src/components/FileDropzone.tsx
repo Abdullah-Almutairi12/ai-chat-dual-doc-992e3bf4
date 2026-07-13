@@ -3,7 +3,6 @@ import { FileText, Loader2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { useI18n } from "@/lib/i18n";
-import { addDocument } from "@/lib/documents";
 import { extractDocument, type ExtractProgress } from "@/lib/pdf-extract";
 import { validateUpload } from "@/lib/pdf/security";
 import { useActiveDocument, type ActiveDocument } from "@/lib/active-document";
@@ -57,7 +56,6 @@ export function FileDropzone({
         name: file.name,
         sizeKb: Math.round(file.size / 1024),
       };
-      addDocument(file.name, doc.sizeKb, tool);
       setDoc(doc);
       onExtracted?.(doc);
       if (!result.text) {

@@ -110,16 +110,6 @@ export const consumeFile = createServerFn({ method: "POST" })
         }
       }
 
-      if (allowed) {
-        await supabase.from("documents").insert({
-          user_id: userId,
-          user_email: email,
-          file_name: data.fileName,
-          file_size: data.fileSize,
-          tool_used: data.tool,
-        });
-      }
-
       const filesProcessed = await readFilesProcessed(supabase, userId);
       return { ...buildEntitlement(filesProcessed, subscribed), allowed };
     } catch (err) {

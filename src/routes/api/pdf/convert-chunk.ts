@@ -8,13 +8,12 @@ import {
   ApiConfigError,
 } from "@/lib/api-auth.server";
 import { loadPdfPipelineContext, extractVisionChunk } from "@/lib/pdf/vision/pipeline.server";
-import { VisionNotConfiguredError } from "@/lib/pdf/vision/pipeline.server";
+import { VisionNotConfiguredError } from "@/lib/pdf/vision/convert.server";
 import { isMasterPdfTool, type MasterConvertTool } from "@/lib/pdf/vision/schema";
 import { isPdfBytes, MASTER_SERVER_PROCESS_LIMIT_BYTES } from "@/lib/pdf/vision/upload-limits";
 
 type ChunkBody = {
-  storageBucket?: string;
-  storagePath?: string;
+  pdfBase64?: string;
   tool?: string;
   pageStart?: number;
   pageEnd?: number;
@@ -22,15 +21,14 @@ type ChunkBody = {
 
 /**
  * POST /api/pdf/convert-chunk
- * JSON: { storageBucket, storagePath, tool, pageStart, pageEnd }
- * Processes 1–3 pages per request — prevents Vercel timeout and 8% freeze.
+ * JSON: { pdfBase64, tool, pageStart, pageEnd } — in-memory only, no storage.
  */
 export const Route = createFileRoute("/api/pdf/convert-chunk")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { supabase, userId } = await authenticateRequest(request);
+          await authenticateRequest(request);
           const body = (await request.json().catch(() => ({}))) as ChunkBody;
 
           const toolRaw = String(body.tool ?? "").trim();
@@ -39,24 +37,15 @@ export const Route = createFileRoute("/api/pdf/convert-chunk")({
           }
           const tool = toolRaw as MasterConvertTool;
 
-          const storageBucket = String(body.storageBucket ?? "").trim();
-          const storagePath = String(body.storagePath ?? "").trim();
-          if (!storageBucket || !storagePath) {
-            return jsonResponse({ ok: false, error: "storageBucket and storagePath required" }, 400);
-          }
-          if (!storagePath.startsWith(`${userId}/`)) {
-            return jsonResponse({ ok: false, error: "Invalid storage path" }, 403);
+          const pdfBase64 = String(body.pdfBase64 ?? "").trim();
+          if (!pdfBase64) {
+            return jsonResponse({ ok: false, error: "pdfBase64 required" }, 400);
           }
 
           const pageStart = Math.max(1, Number(body.pageStart) || 1);
           const pageEnd = Math.max(pageStart, Number(body.pageEnd) || pageStart);
 
-          const { data, error } = await supabase.storage.from(storageBucket).download(storagePath);
-          if (error || !data) {
-            return jsonResponse({ ok: false, error: error?.message ?? "Storage download failed" }, 404);
-          }
-
-          const pdfBytes = new Uint8Array(await data.arrayBuffer());
+          const pdfBytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
           if (pdfBytes.byteLength > MASTER_SERVER_PROCESS_LIMIT_BYTES) {
             return jsonResponse({ ok: false, error: "File exceeds 20MB limit" }, 413);
           }

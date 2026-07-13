@@ -1,5 +1,4 @@
 import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
-import { STORAGE_BUCKETS } from "@/integrations/supabase/storage-buckets";
 
 import {
   arrayBufferToValidatedBlob,
@@ -9,7 +8,6 @@ import {
   startProgressHeartbeat,
 } from "@/lib/pdf/binary-response";
 import type { PdfProgress } from "@/lib/pdf/progress";
-import { uploadFileViaApi } from "@/lib/pdf-storage";
 import { formatFromFileName } from "@/lib/pdf/validate-output";
 import type { FidelityPageRender } from "@/lib/pdf/vision/build-pptx.server";
 import {
@@ -36,7 +34,6 @@ export type MasterConversionMeta = {
   skipReason?: string;
 };
 
-/** @deprecated Use isMasterPdfTool */
 export function isVisionConvertTool(mode: string): mode is MasterConvertTool {
   return isMasterPdfTool(mode);
 }
@@ -53,26 +50,22 @@ async function countPdfPages(file: File): Promise<number> {
   }
 }
 
+async function fileToBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  return btoa(binary);
+}
+
 function shouldUseChunkedPipeline(file: File, pageCount: number): boolean {
   return file.size > MASTER_CLIENT_UPLOAD_LIMIT_BYTES || pageCount > 3;
 }
 
-type StorageRef = { bucket: string; path: string };
-
-async function ensureStorageUpload(file: File, tool: MasterConvertTool): Promise<StorageRef | null> {
-  const uploaded = await uploadFileViaApi(file, {
-    bucket: STORAGE_BUCKETS.pdfTools,
-    toolId: tool.replace("pdf-", ""),
-  });
-  if (!uploaded) return null;
-  return { bucket: uploaded.bucket, path: uploaded.path };
-}
-
-/** Chunked async pipeline — Supabase storage + per-page Vision AI (no 8% freeze). */
+/** In-memory chunked Vision AI — sends PDF base64 per chunk, no storage. */
 async function convertViaChunkedPipeline(
   file: File,
   tool: MasterConvertTool,
-  storage: StorageRef,
+  pdfBase64: string,
   pageCount: number,
   token: string,
   onProgress?: (p: PdfProgress) => void,
@@ -97,13 +90,7 @@ async function convertViaChunkedPipeline(
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        storageBucket: storage.bucket,
-        storagePath: storage.path,
-        tool,
-        pageStart: start,
-        pageEnd: end,
-      }),
+      body: JSON.stringify({ pdfBase64, tool, pageStart: start, pageEnd: end }),
     });
 
     const data = (await res.json().catch(() => ({}))) as {
@@ -144,10 +131,7 @@ async function convertViaChunkedPipeline(
     }),
   });
 
-  if (!buildRes.ok) {
-    console.info("[master-engine] build failed", buildRes.status);
-    return null;
-  }
+  if (!buildRes.ok) return null;
 
   const contentType = buildRes.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) return null;
@@ -157,9 +141,7 @@ async function convertViaChunkedPipeline(
   if (!buffer) return null;
 
   const format = formatFromFileName(`output.${ext}`);
-  if (format === "docx" || format === "pptx" || format === "xlsx") {
-    if (!quickZipHeaderCheck(buffer)) return null;
-  }
+  if ((format === "docx" || format === "pptx" || format === "xlsx") && !quickZipHeaderCheck(buffer)) return null;
 
   const blob = await arrayBufferToValidatedBlob(buffer, mimeForToolExt(ext), format);
   if (!blob) return null;
@@ -168,7 +150,6 @@ async function convertViaChunkedPipeline(
   return { blob, ext };
 }
 
-/** Direct upload for small PDFs (≤4MB, ≤3 pages). */
 async function convertViaDirectUpload(
   file: File,
   tool: MasterConvertTool,
@@ -217,9 +198,6 @@ async function convertViaDirectUpload(
   }
 }
 
-/**
- * Server-side Master Engine — Adobe-style AI extraction with layout fidelity.
- */
 export async function convertViaMasterEngine(
   file: File,
   tool: MasterConvertTool,
@@ -236,66 +214,20 @@ export async function convertViaMasterEngine(
     if (!token) return null;
 
     const pageCount = await countPdfPages(file);
-    const useChunked = shouldUseChunkedPipeline(file, pageCount);
 
-    if (useChunked) {
-      onProgress?.({ stage: "master-storage", percent: 6 });
-      const storage = await ensureStorageUpload(file, tool);
-      if (!storage) return null;
-      return convertViaChunkedPipeline(file, tool, storage, pageCount, token, onProgress);
+    if (shouldUseChunkedPipeline(file, pageCount)) {
+      onProgress?.({ stage: "master-prepare", percent: 6 });
+      const pdfBase64 = await fileToBase64(file);
+      return convertViaChunkedPipeline(file, tool, pdfBase64, pageCount, token, onProgress);
     }
 
-    if (file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
-      return convertViaDirectUpload(file, tool, token, onProgress);
-    }
-
-    onProgress?.({ stage: "master-storage", percent: 6 });
-    const storage = await ensureStorageUpload(file, tool);
-    if (!storage) return null;
-
-    const form = new FormData();
-    form.append("tool", tool);
-    form.append("storageBucket", storage.bucket);
-    form.append("storagePath", storage.path);
-    form.append("fileName", file.name);
-
-    onProgress?.({ stage: "master-upload", percent: 8 });
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), MASTER_FETCH_TIMEOUT_MS);
-    const stopHeartbeat = startProgressHeartbeat(onProgress, "master-upload", 8, 45, MASTER_FETCH_TIMEOUT_MS - 2000);
-
-    try {
-      const res = await fetch("/api/pdf/convert-vision", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-        signal: controller.signal,
-      });
-      stopHeartbeat();
-      if (!res.ok) return null;
-      const contentType = res.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) return null;
-      onProgress?.({ stage: "master-download", percent: 88 });
-      const ext = extForMasterTool(tool);
-      const buffer = await readBoundedArrayBuffer(res, 32 * 1024 * 1024);
-      if (!buffer) return null;
-      const format = formatFromFileName(`output.${ext}`);
-      if ((format === "docx" || format === "pptx" || format === "xlsx") && !quickZipHeaderCheck(buffer)) return null;
-      const blob = await arrayBufferToValidatedBlob(buffer, mimeForToolExt(ext), format);
-      if (!blob) return null;
-      onProgress?.({ stage: "done", percent: 100 });
-      return { blob, ext };
-    } finally {
-      stopHeartbeat();
-      clearTimeout(timer);
-    }
+    return convertViaDirectUpload(file, tool, token, onProgress);
   } catch (err) {
     console.info("[master-engine] error", err instanceof Error ? err.message : err);
     return null;
   }
 }
 
-/** @deprecated Use convertViaMasterEngine */
 export const convertViaVisionApi = convertViaMasterEngine;
 
 export async function runMasterConversion(
