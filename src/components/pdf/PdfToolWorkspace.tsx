@@ -169,10 +169,23 @@ export function PdfToolWorkspace({ toolId }: Props) {
 
         if (tool!.convertMode) {
           const mode = tool!.convertMode;
-          const result = await runMasterConversion(mode, batch[0], { imageFiles: batch }, onProgress);
+          let result;
+          try {
+            result = await runMasterConversion(mode, batch[0], { imageFiles: batch }, onProgress);
+          } catch (convErr) {
+            const msg = convErr instanceof Error ? convErr.message : "";
+            if (msg === "VISION_NOT_CONFIGURED") {
+              setProcessError(t("pdf_vision_not_configured"));
+              toast.error(t("pdf_vision_not_configured"));
+              return;
+            }
+            throw convErr;
+          }
 
           if (result.meta.usedFallback) {
             toast.info(t("pdf_vision_fallback"));
+          } else if (result.meta.source === "master") {
+            toast.success(t("pdf_vision_active"));
           }
 
           const applied = await applyConversionResult(result, base);

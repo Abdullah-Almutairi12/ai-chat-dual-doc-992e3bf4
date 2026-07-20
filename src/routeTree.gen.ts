@@ -33,6 +33,7 @@ import { Route as ApiPublicTapWebhookRouteImport } from './routes/api/public/tap
 import { Route as ApiPublicTapRenewRouteImport } from './routes/api/public/tap-renew'
 import { Route as ApiPublicSendWelcomeRouteImport } from './routes/api/public/send-welcome'
 import { Route as ApiPublicBillingHealthRouteImport } from './routes/api/public/billing-health'
+import { Route as ApiPdfVisionStatusRouteImport } from './routes/api/pdf/vision-status'
 import { Route as ApiPdfUploadRouteImport } from './routes/api/pdf/upload'
 import { Route as ApiPdfConvertVisionRouteImport } from './routes/api/pdf/convert-vision'
 import { Route as ApiPdfConvertChunkRouteImport } from './routes/api/pdf/convert-chunk'
@@ -162,6 +163,11 @@ const ApiPublicBillingHealthRoute = ApiPublicBillingHealthRouteImport.update({
   path: '/api/public/billing-health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPdfVisionStatusRoute = ApiPdfVisionStatusRouteImport.update({
+  id: '/api/pdf/vision-status',
+  path: '/api/pdf/vision-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPdfUploadRoute = ApiPdfUploadRouteImport.update({
   id: '/api/pdf/upload',
   path: '/api/pdf/upload',
@@ -243,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/api/pdf/convert-chunk': typeof ApiPdfConvertChunkRoute
   '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
   '/api/pdf/upload': typeof ApiPdfUploadRoute
+  '/api/pdf/vision-status': typeof ApiPdfVisionStatusRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/api/pdf/convert-chunk': typeof ApiPdfConvertChunkRoute
   '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
   '/api/pdf/upload': typeof ApiPdfUploadRoute
+  '/api/pdf/vision-status': typeof ApiPdfVisionStatusRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
@@ -312,6 +320,7 @@ export interface FileRoutesById {
   '/api/pdf/convert-chunk': typeof ApiPdfConvertChunkRoute
   '/api/pdf/convert-vision': typeof ApiPdfConvertVisionRoute
   '/api/pdf/upload': typeof ApiPdfUploadRoute
+  '/api/pdf/vision-status': typeof ApiPdfVisionStatusRoute
   '/api/public/billing-health': typeof ApiPublicBillingHealthRoute
   '/api/public/send-welcome': typeof ApiPublicSendWelcomeRoute
   '/api/public/tap-renew': typeof ApiPublicTapRenewRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/api/pdf/convert-chunk'
     | '/api/pdf/convert-vision'
     | '/api/pdf/upload'
+    | '/api/pdf/vision-status'
     | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
@@ -380,6 +390,7 @@ export interface FileRouteTypes {
     | '/api/pdf/convert-chunk'
     | '/api/pdf/convert-vision'
     | '/api/pdf/upload'
+    | '/api/pdf/vision-status'
     | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
@@ -416,6 +427,7 @@ export interface FileRouteTypes {
     | '/api/pdf/convert-chunk'
     | '/api/pdf/convert-vision'
     | '/api/pdf/upload'
+    | '/api/pdf/vision-status'
     | '/api/public/billing-health'
     | '/api/public/send-welcome'
     | '/api/public/tap-renew'
@@ -440,6 +452,7 @@ export interface RootRouteChildren {
   ApiPdfConvertChunkRoute: typeof ApiPdfConvertChunkRoute
   ApiPdfConvertVisionRoute: typeof ApiPdfConvertVisionRoute
   ApiPdfUploadRoute: typeof ApiPdfUploadRoute
+  ApiPdfVisionStatusRoute: typeof ApiPdfVisionStatusRoute
   ApiPublicBillingHealthRoute: typeof ApiPublicBillingHealthRoute
   ApiPublicSendWelcomeRoute: typeof ApiPublicSendWelcomeRoute
   ApiPublicTapRenewRoute: typeof ApiPublicTapRenewRoute
@@ -616,6 +629,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBillingHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pdf/vision-status': {
+      id: '/api/pdf/vision-status'
+      path: '/api/pdf/vision-status'
+      fullPath: '/api/pdf/vision-status'
+      preLoaderRoute: typeof ApiPdfVisionStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/pdf/upload': {
       id: '/api/pdf/upload'
       path: '/api/pdf/upload'
@@ -771,6 +791,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPdfConvertChunkRoute: ApiPdfConvertChunkRoute,
   ApiPdfConvertVisionRoute: ApiPdfConvertVisionRoute,
   ApiPdfUploadRoute: ApiPdfUploadRoute,
+  ApiPdfVisionStatusRoute: ApiPdfVisionStatusRoute,
   ApiPublicBillingHealthRoute: ApiPublicBillingHealthRoute,
   ApiPublicSendWelcomeRoute: ApiPublicSendWelcomeRoute,
   ApiPublicTapRenewRoute: ApiPublicTapRenewRoute,

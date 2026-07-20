@@ -13,14 +13,18 @@ export type VisionConfig = {
   keyFallback: boolean;
   openaiKey?: string;
   anthropicKey?: string;
+  /** OpenAI-compatible API base (cloud / Azure / OpenRouter). */
+  openaiBaseUrl: string;
   /** OpenAI vision model — defaults to gpt-4o. */
   openaiModel: string;
   anthropicModel: string;
 };
 
-const OPENAI_KEY_NAMES = ["OPENAI_API_KEY"] as const;
+const OPENAI_KEY_NAMES = ["OPENAI_API_KEY", "AZURE_OPENAI_API_KEY"] as const;
 const ANTHROPIC_KEY_NAMES = ["ANTHROPIC_API_KEY"] as const;
+const OPENAI_BASE_NAMES = ["OPENAI_API_BASE_URL", "OPENAI_BASE_URL", "AZURE_OPENAI_ENDPOINT"] as const;
 
+const DEFAULT_OPENAI_BASE = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_MODEL = "gpt-4o";
 const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022";
 
@@ -72,6 +76,13 @@ export function alternateProvider(provider: VisionProvider): VisionProvider {
   return provider === "openai" ? "anthropic" : "openai";
 }
 
+function normalizeOpenAiBase(raw: string | undefined): string {
+  const trimmed = (raw ?? DEFAULT_OPENAI_BASE).trim().replace(/\/+$/, "");
+  if (trimmed.endsWith("/v1")) return trimmed;
+  if (trimmed.includes("/openai/deployments/")) return trimmed;
+  return `${trimmed}/v1`;
+}
+
 /** Resolve Vision AI credentials from server env (never exposed to client). */
 export function resolveVisionConfig(): VisionConfig {
   hydrateVercelProductionEnv();
@@ -96,7 +107,25 @@ export function resolveVisionConfig(): VisionConfig {
     keyFallback,
     openaiKey,
     anthropicKey,
-    openaiModel: readEnv("OPENAI_VISION_MODEL") ?? DEFAULT_OPENAI_MODEL,
+    openaiBaseUrl: normalizeOpenAiBase(firstEnv(OPENAI_BASE_NAMES)),
+    openaiModel: readEnv("OPENAI_VISION_MODEL") ?? readEnv("AZURE_OPENAI_DEPLOYMENT") ?? DEFAULT_OPENAI_MODEL,
     anthropicModel: readEnv("ANTHROPIC_VISION_MODEL") ?? DEFAULT_ANTHROPIC_MODEL,
+  };
+}
+
+/** Safe diagnostics for admin / health checks (never exposes keys). */
+export function getVisionEnvDiagnostics() {
+  hydrateVercelProductionEnv();
+  const config = resolveVisionConfig();
+  return {
+    ok: config.configured,
+    provider: config.provider,
+    preferredProvider: config.preferredProvider,
+    keyFallback: config.keyFallback,
+    openaiModel: config.openaiModel,
+    anthropicModel: config.anthropicModel,
+    openaiBaseUrl: config.openaiBaseUrl,
+    hasOpenAiKey: Boolean(config.openaiKey),
+    hasAnthropicKey: Boolean(config.anthropicKey),
   };
 }

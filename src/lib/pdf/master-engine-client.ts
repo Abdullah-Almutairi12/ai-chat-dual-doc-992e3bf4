@@ -31,7 +31,51 @@ export type MasterConversionMeta = {
   source: "master" | "client";
   usedFallback: boolean;
   skipReason?: string;
+  visionConfigured?: boolean;
+  visionProvider?: string;
+  visionModel?: string;
 };
+
+export type VisionStatus = {
+  ok: boolean;
+  provider?: string;
+  openaiModel?: string;
+  anthropicModel?: string;
+};
+
+export async function fetchVisionStatus(): Promise<VisionStatus> {
+  try {
+    const res = await fetch("/api/pdf/vision-status");
+    const data = (await res.json()) as {
+      ok?: boolean;
+      vision?: {
+        provider?: string;
+        openaiModel?: string;
+        anthropicModel?: string;
+      };
+    };
+    return {
+      ok: Boolean(data.ok),
+      provider: data.vision?.provider,
+      openaiModel: data.vision?.openaiModel,
+      anthropicModel: data.vision?.anthropicModel,
+    };
+  } catch {
+    return { ok: false };
+  }
+}
+
+type MasterApiError = { code?: string; error?: string };
+
+async function readMasterApiError(res: Response): Promise<MasterApiError> {
+  try {
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) return {};
+    return (await res.json()) as MasterApiError;
+  } catch {
+    return {};
+  }
+}
 
 export function isVisionConvertTool(mode: string): mode is MasterConvertTool {
   return isMasterPdfTool(mode);
@@ -88,6 +132,7 @@ async function convertViaChunkedPipeline(
 
     const data = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
+      code?: string;
       pages?: VisionPage[];
       renders?: FidelityPageRender[];
       provider?: string;
@@ -97,6 +142,9 @@ async function convertViaChunkedPipeline(
 
     if (!res.ok || !data.ok || !data.pages?.length) {
       console.info("[master-engine] chunk failed", start, end, data.error ?? res.status);
+      if (data.code === "VISION_NOT_CONFIGURED" || data.error?.toLowerCase().includes("not configured")) {
+        throw new Error("VISION_NOT_CONFIGURED");
+      }
       return null;
     }
 
@@ -168,9 +216,17 @@ async function convertViaDirectUpload(
     });
     stopHeartbeat();
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const apiErr = await readMasterApiError(res);
+      if (apiErr.code === "VISION_NOT_CONFIGURED") throw new Error("VISION_NOT_CONFIGURED");
+      return null;
+    }
     const contentType = res.headers.get("content-type") ?? "";
-    if (contentType.includes("application/json")) return null;
+    if (contentType.includes("application/json")) {
+      const apiErr = await readMasterApiError(res);
+      if (apiErr.code === "VISION_NOT_CONFIGURED") throw new Error("VISION_NOT_CONFIGURED");
+      return null;
+    }
 
     onProgress?.({ stage: "master-download", percent: 88 });
     const ext = extForMasterTool(tool);
@@ -232,7 +288,7 @@ async function runClientConversion(
   return runConversion(mode, file, extra, onProgress);
 }
 
-/** Vision AI first for fidelity; browser visual export as fallback. */
+/** Vision AI first for fidelity; browser export only when cloud AI is unavailable. */
 export async function runMasterConversion(
   mode: string,
   file: File,
@@ -244,15 +300,40 @@ export async function runMasterConversion(
     return { ...result, meta: { source: "client", usedFallback: false } };
   }
 
+  const visionStatus = await fetchVisionStatus();
   let clientError: string | undefined;
 
   if (file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
     onProgress?.({ stage: "master-upload", percent: 8 });
-    const master = await convertViaMasterEngine(file, mode, onProgress);
-    if (master?.blob?.size) {
-      return { blob: master.blob, ext: master.ext, meta: { source: "master", usedFallback: false } };
+    try {
+      const master = await convertViaMasterEngine(file, mode, onProgress);
+      if (master?.blob?.size) {
+        return {
+          blob: master.blob,
+          ext: master.ext,
+          meta: {
+            source: "master",
+            usedFallback: false,
+            visionConfigured: visionStatus.ok,
+            visionProvider: visionStatus.provider,
+            visionModel: visionStatus.provider === "anthropic" ? visionStatus.anthropicModel : visionStatus.openaiModel,
+          },
+        };
+      }
+      clientError = visionStatus.ok ? "master_failed" : "VISION_NOT_CONFIGURED";
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "VISION_NOT_CONFIGURED") {
+        throw new Error("VISION_NOT_CONFIGURED");
+      }
+      clientError = msg || "master_error";
     }
-    clientError = "master_unavailable";
+  } else {
+    clientError = "file_too_large_for_vision";
+  }
+
+  if (!visionStatus.ok && clientError === "VISION_NOT_CONFIGURED") {
+    throw new Error("VISION_NOT_CONFIGURED");
   }
 
   try {
@@ -261,7 +342,12 @@ export async function runMasterConversion(
     if (client.blob?.size || client.blobs?.length) {
       return {
         ...client,
-        meta: { source: "client", usedFallback: true, skipReason: clientError },
+        meta: {
+          source: "client",
+          usedFallback: true,
+          skipReason: clientError,
+          visionConfigured: visionStatus.ok,
+        },
       };
     }
     clientError = "empty_client_output";

@@ -27,7 +27,12 @@ async function callOpenAiVision(
 ): Promise<string> {
   if (!config.openaiKey) throw new Error("OPENAI_API_KEY is not configured");
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const base = config.openaiBaseUrl.replace(/\/+$/, "");
+  const url = base.includes("/openai/deployments/")
+    ? `${base}/chat/completions?api-version=2024-02-15-preview`
+    : `${base}/chat/completions`;
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.openaiKey}`,
