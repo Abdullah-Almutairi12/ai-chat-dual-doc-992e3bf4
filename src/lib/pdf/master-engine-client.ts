@@ -232,7 +232,7 @@ async function runClientConversion(
   return runConversion(mode, file, extra, onProgress);
 }
 
-/** Browser-first conversion — server Vision AI is optional enhancement only. */
+/** Vision AI first for fidelity; browser visual export as fallback. */
 export async function runMasterConversion(
   mode: string,
   file: File,
@@ -245,24 +245,29 @@ export async function runMasterConversion(
   }
 
   let clientError: string | undefined;
+
+  if (file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
+    onProgress?.({ stage: "master-upload", percent: 8 });
+    const master = await convertViaMasterEngine(file, mode, onProgress);
+    if (master?.blob?.size) {
+      return { blob: master.blob, ext: master.ext, meta: { source: "master", usedFallback: false } };
+    }
+    clientError = "master_unavailable";
+  }
+
   try {
-    onProgress?.({ stage: "client-local", percent: 8 });
+    onProgress?.({ stage: "client-visual", percent: 12 });
     const client = await runClientConversion(mode, file, extra, onProgress);
     if (client.blob?.size || client.blobs?.length) {
-      return { ...client, meta: { source: "client", usedFallback: false } };
+      return {
+        ...client,
+        meta: { source: "client", usedFallback: true, skipReason: clientError },
+      };
     }
     clientError = "empty_client_output";
   } catch (err) {
     clientError = err instanceof Error ? err.message : "client_failed";
     console.error("[master-engine] client conversion failed", err);
-  }
-
-  if (file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
-    onProgress?.({ stage: "master-upload", percent: 10 });
-    const master = await convertViaMasterEngine(file, mode, onProgress);
-    if (master?.blob?.size) {
-      return { blob: master.blob, ext: master.ext, meta: { source: "master", usedFallback: true, skipReason: clientError } };
-    }
   }
 
   throw new Error(clientError ?? "conversion_failed");

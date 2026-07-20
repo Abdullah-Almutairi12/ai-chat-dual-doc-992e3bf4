@@ -157,7 +157,12 @@ function boxesFromOcr(data: any): LayoutBox[] {
 export async function extractLayout(
   file: File,
   onProgress?: ProgressFn,
-  opts?: { backdrop?: "all" | "scanned-only"; ocr?: "full" | "optional" | "skip" },
+  opts?: {
+    backdrop?: "all" | "scanned-only";
+    ocr?: "full" | "optional" | "skip";
+    renderScale?: number;
+    jpegQuality?: number;
+  },
 ): Promise<LayoutResult> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new Error("Layout extraction requires a browser environment");
@@ -171,6 +176,8 @@ export async function extractLayout(
 
   const backdropMode = opts?.backdrop ?? "all";
   const ocrMode = opts?.ocr ?? "full";
+  const renderScale = opts?.renderScale ?? RENDER_SCALE;
+  const jpegDefault = opts?.jpegQuality ?? 0.82;
 
   const pages: LayoutPage[] = [];
   const scannedIdx: number[] = [];
@@ -179,7 +186,7 @@ export async function extractLayout(
   // Pass 1 — render every page + place text-layer boxes.
   for (let i = 1; i <= pageCount; i++) {
     const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: RENDER_SCALE });
+    const viewport = page.getViewport({ scale: renderScale });
     const canvas = await renderCanvas(page, viewport);
 
     const content = await page.getTextContent();
@@ -189,7 +196,7 @@ export async function extractLayout(
     const isScanned = !hasTextLayer;
     const image =
       backdropMode === "all" || isScanned
-        ? canvas.toDataURL("image/jpeg", isScanned ? 0.72 : 0.82)
+        ? canvas.toDataURL("image/jpeg", isScanned ? Math.min(jpegDefault, 0.72) : jpegDefault)
         : "";
 
     const boxes = hasTextLayer ? boxesFromTextLayer(pdfjs, content, viewport) : [];
