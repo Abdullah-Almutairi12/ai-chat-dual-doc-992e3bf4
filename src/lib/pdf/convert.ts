@@ -21,13 +21,16 @@ export async function pdfToDocx(file: File, onProgress?: ProgressFn): Promise<Bl
   const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak } = await loadDocxModule();
 
   onProgress?.({ stage: "layout", percent: 5 });
-  const layout = await extractLayout(file, (p) =>
-    onProgress?.({
-      stage: p.stage,
-      percent: 5 + Math.round(p.percent * 0.7),
-      page: p.page,
-      pageCount: p.pageCount,
-    }),
+  const layout = await extractLayout(
+    file,
+    (p) =>
+      onProgress?.({
+        stage: p.stage,
+        percent: 5 + Math.round(p.percent * 0.7),
+        page: p.page,
+        pageCount: p.pageCount,
+      }),
+    { repairBrokenText: true, ocr: "optional", renderScale: 1.5 },
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

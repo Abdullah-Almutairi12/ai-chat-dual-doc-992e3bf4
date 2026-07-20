@@ -101,6 +101,7 @@ function renderBlockToSlide(
     ? normLayoutToInches(block.layout)
     : layoutToInches(block.layout, flowY);
   let nextY = box.y;
+  const invisibleOnScan = scannedBackground;
 
   switch (block.type) {
     case "shape": {

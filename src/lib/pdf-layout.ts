@@ -18,6 +18,7 @@
 
 import { isRtlText } from "./pdf-extract";
 import { groupIntoLines, joinLineItems, normalizeArabicText, rtlSpanStyle } from "./pdf/bidi";
+import { isBrokenTextLayout } from "./pdf/layout-quality";
 import { loadPdfjsWithWorker } from "./pdf/pdfjs-worker";
 
 export type LayoutStage = "loading" | "rendering" | "ocr" | "done";
@@ -160,6 +161,7 @@ export async function extractLayout(
   opts?: {
     backdrop?: "all" | "scanned-only";
     ocr?: "full" | "optional" | "skip";
+    repairBrokenText?: boolean;
     renderScale?: number;
     jpegQuality?: number;
   },
@@ -176,6 +178,7 @@ export async function extractLayout(
 
   const backdropMode = opts?.backdrop ?? "all";
   const ocrMode = opts?.ocr ?? "full";
+  const repairBroken = opts?.repairBrokenText === true;
   const renderScale = opts?.renderScale ?? RENDER_SCALE;
   const jpegDefault = opts?.jpegQuality ?? 0.82;
 
@@ -212,7 +215,23 @@ export async function extractLayout(
     });
   }
 
-  // Pass 2 — OCR scanned pages (optional; never aborts the whole export).
+  if (repairBroken) {
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i]!;
+      if (!p.isScanned && isBrokenTextLayout(p.boxes, p.width)) {
+        if (!scannedIdx.includes(i)) scannedIdx.push(i);
+        p.boxes = [];
+        if (!p.image) {
+          const page = await pdf.getPage(i + 1);
+          const viewport = page.getViewport({ scale: renderScale });
+          const canvas = await renderCanvas(page, viewport);
+          p.image = canvas.toDataURL("image/jpeg", jpegDefault);
+        }
+      }
+    }
+  }
+
+  // Pass 2 — OCR scanned / repaired pages (optional; never aborts the whole export).
   if (scannedIdx.length > 0 && ocrMode !== "skip") {
     try {
       const { createWorker } = await import("tesseract.js");
