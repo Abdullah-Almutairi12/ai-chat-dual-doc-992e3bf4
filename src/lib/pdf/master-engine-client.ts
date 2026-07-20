@@ -39,9 +39,8 @@ export function isVisionConvertTool(mode: string): mode is MasterConvertTool {
 
 async function countPdfPages(file: File): Promise<number> {
   try {
-    const pdfjs = await import("pdfjs-dist");
-    const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
-    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+    const { loadPdfjsWithWorker } = await import("@/lib/pdf/pdfjs-worker");
+    const pdfjs = await loadPdfjsWithWorker();
     const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
     return Math.min(pdf.numPages, MAX_VISION_PAGES);
   } catch {
@@ -223,42 +222,48 @@ export async function convertViaMasterEngine(
 
 export const convertViaVisionApi = convertViaMasterEngine;
 
+async function runClientConversion(
+  mode: string,
+  file: File,
+  extra?: { imageFiles?: File[]; imageFormat?: "jpeg" | "png" },
+  onProgress?: (p: PdfProgress) => void,
+) {
+  const { runConversion } = await import("@/lib/pdf/convert");
+  return runConversion(mode, file, extra, onProgress);
+}
+
+/** Browser-first conversion — server Vision AI is optional enhancement only. */
 export async function runMasterConversion(
   mode: string,
   file: File,
   extra?: { imageFiles?: File[]; imageFormat?: "jpeg" | "png" },
   onProgress?: (p: PdfProgress) => void,
 ): Promise<{ blob?: Blob; blobs?: { name: string; blob: Blob }[]; ext: string; meta: MasterConversionMeta }> {
-  if (isMasterPdfTool(mode) && file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
-    const master = await convertViaMasterEngine(file, mode, onProgress);
-    if (master) {
-      return { blob: master.blob, ext: master.ext, meta: { source: "master", usedFallback: false } };
-    }
-    onProgress?.({ stage: "client-fallback", percent: 12 });
-  } else if (isMasterPdfTool(mode)) {
-    onProgress?.({ stage: "client-local", percent: 12 });
+  if (!isMasterPdfTool(mode)) {
+    const result = await runClientConversion(mode, file, extra, onProgress);
+    return { ...result, meta: { source: "client", usedFallback: false } };
   }
 
+  let clientError: string | undefined;
   try {
-    const { runConversion } = await import("@/lib/pdf/convert");
-    const result = await runConversion(mode, file, extra, onProgress);
-    return {
-      ...result,
-      meta: {
-        source: "client",
-        usedFallback: isMasterPdfTool(mode),
-        skipReason: isMasterPdfTool(mode) ? masterSkipReason(file) ?? undefined : undefined,
-      },
-    };
+    onProgress?.({ stage: "client-local", percent: 8 });
+    const client = await runClientConversion(mode, file, extra, onProgress);
+    if (client.blob?.size || client.blobs?.length) {
+      return { ...client, meta: { source: "client", usedFallback: false } };
+    }
+    clientError = "empty_client_output";
   } catch (err) {
+    clientError = err instanceof Error ? err.message : "client_failed";
     console.error("[master-engine] client conversion failed", err);
-    return {
-      ext: isMasterPdfTool(mode) ? extForMasterTool(mode) : "pdf",
-      meta: {
-        source: "client",
-        usedFallback: true,
-        skipReason: err instanceof Error ? err.message : "client_failed",
-      },
-    };
   }
+
+  if (file.size <= MASTER_CLIENT_UPLOAD_LIMIT_BYTES) {
+    onProgress?.({ stage: "master-upload", percent: 10 });
+    const master = await convertViaMasterEngine(file, mode, onProgress);
+    if (master?.blob?.size) {
+      return { blob: master.blob, ext: master.ext, meta: { source: "master", usedFallback: true, skipReason: clientError } };
+    }
+  }
+
+  throw new Error(clientError ?? "conversion_failed");
 }

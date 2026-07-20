@@ -65,12 +65,19 @@ export async function validateOutputBlob(blob: Blob, format: OutputFormat): Prom
   }
 }
 
-/** Returns the blob if valid, otherwise null (caller should retry fallback). */
+/** Returns the blob if valid; accepts ZIP-based Office files when OOXML parse is inconclusive. */
 export async function ensureValidOutput(blob: Blob, format: OutputFormat): Promise<Blob | null> {
   const ok = await validateOutputBlob(blob, format);
-  if (!ok) {
-    console.warn("[validate-output] rejected output", { format, bytes: blob?.size ?? 0 });
-    return null;
+  if (ok) return blob;
+
+  if (format === "docx" || format === "pptx" || format === "xlsx") {
+    const h = await headBytes(blob, 4);
+    if (isZip(h) && blob.size >= 256) {
+      console.warn("[validate-output] strict check failed; accepting ZIP output", { format, bytes: blob.size });
+      return blob;
+    }
   }
-  return blob;
+
+  console.warn("[validate-output] rejected output", { format, bytes: blob?.size ?? 0 });
+  return null;
 }

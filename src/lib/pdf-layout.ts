@@ -18,6 +18,7 @@
 
 import { isRtlText } from "./pdf-extract";
 import { groupIntoLines, joinLineItems, normalizeArabicText, rtlSpanStyle } from "./pdf/bidi";
+import { loadPdfjsWithWorker } from "./pdf/pdfjs-worker";
 
 export type LayoutStage = "loading" | "rendering" | "ocr" | "done";
 
@@ -67,10 +68,7 @@ function meaningfulLength(s: string): number {
 }
 
 async function loadPdfjs() {
-  const pdfjs = await import("pdfjs-dist");
-  const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-  return pdfjs;
+  return loadPdfjsWithWorker();
 }
 
 async function renderCanvas(page: any, viewport: any): Promise<HTMLCanvasElement> {
@@ -159,7 +157,7 @@ function boxesFromOcr(data: any): LayoutBox[] {
 export async function extractLayout(
   file: File,
   onProgress?: ProgressFn,
-  opts?: { backdrop?: "all" | "scanned-only" },
+  opts?: { backdrop?: "all" | "scanned-only"; ocr?: "full" | "optional" | "skip" },
 ): Promise<LayoutResult> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new Error("Layout extraction requires a browser environment");
@@ -172,6 +170,7 @@ export async function extractLayout(
   const pageCount = pdf.numPages;
 
   const backdropMode = opts?.backdrop ?? "all";
+  const ocrMode = opts?.ocr ?? "full";
 
   const pages: LayoutPage[] = [];
   const scannedIdx: number[] = [];
@@ -206,29 +205,43 @@ export async function extractLayout(
     });
   }
 
-  // Pass 2 — OCR scanned pages and overlay their line boxes.
-  if (scannedIdx.length > 0) {
-    const { createWorker } = await import("tesseract.js");
-    const worker = await createWorker(OCR_LANGS, 1);
+  // Pass 2 — OCR scanned pages (optional; never aborts the whole export).
+  if (scannedIdx.length > 0 && ocrMode !== "skip") {
     try {
-      for (let k = 0; k < scannedIdx.length; k++) {
-        const pageIdx = scannedIdx[k];
-        const page = await pdf.getPage(pageIdx + 1);
-        const viewport = page.getViewport({ scale: RENDER_SCALE });
-        const canvas = await renderCanvas(page, viewport);
-        const { data } = await worker.recognize(canvas, {}, { blocks: true } as any);
-        const boxes = boxesFromOcr(data);
-        pages[pageIdx].boxes = boxes;
-        if (isRtlText(data?.text ?? "")) rtlVotes++;
-        onProgress?.({
-          stage: "ocr",
-          page: pageIdx + 1,
-          pageCount,
-          percent: 47 + Math.round(((k + 1) / scannedIdx.length) * 51),
-        });
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker(OCR_LANGS, 1);
+      try {
+        for (let k = 0; k < scannedIdx.length; k++) {
+          const pageIdx = scannedIdx[k]!;
+          const pageData = pages[pageIdx];
+          if (!pageData?.image) continue;
+          try {
+            const { data } = await Promise.race([
+              worker.recognize(pageData.image, {}, { blocks: true } as object),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("ocr_timeout")), 90_000),
+              ),
+            ]);
+            const boxes = boxesFromOcr(data);
+            if (boxes.length) pages[pageIdx]!.boxes = boxes;
+            if (isRtlText(data?.text ?? "")) rtlVotes++;
+          } catch (pageErr) {
+            console.warn("[extractLayout] OCR page failed", pageIdx + 1, pageErr);
+            if (ocrMode === "full") throw pageErr;
+          }
+          onProgress?.({
+            stage: "ocr",
+            page: pageIdx + 1,
+            pageCount,
+            percent: 47 + Math.round(((k + 1) / scannedIdx.length) * 51),
+          });
+        }
+      } finally {
+        await worker.terminate();
       }
-    } finally {
-      await worker.terminate();
+    } catch (ocrErr) {
+      console.warn("[extractLayout] OCR skipped", ocrErr);
+      if (ocrMode === "full") throw ocrErr;
     }
   }
 

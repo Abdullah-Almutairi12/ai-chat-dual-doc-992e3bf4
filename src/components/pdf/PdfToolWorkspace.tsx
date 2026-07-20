@@ -188,6 +188,10 @@ export function PdfToolWorkspace({ toolId }: Props) {
               toast.error(t("pdf_output_invalid"));
             }
           } else {
+            logToolError(toolId, new Error(result.meta.skipReason ?? "conversion_empty"), {
+              source: result.meta.source,
+              usedFallback: result.meta.usedFallback,
+            });
             setProcessError(t("pdf_process_failed"));
             toast.error(t("pdf_process_failed"));
           }
