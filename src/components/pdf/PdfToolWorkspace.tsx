@@ -276,9 +276,11 @@ export function PdfToolWorkspace({ toolId }: Props) {
           outName = `${base}-edited.pdf`;
           break;
         case "redact":
-          blob = await pdf.redactRegions(batch[0], [
-            { page: redactPage, x: 72, y: 700, width: 200, height: 20 },
-          ]);
+          blob = await pdf.redactRegions(
+            batch[0],
+            [{ page: redactPage, x: 72, y: 700, width: 200, height: 20 }],
+            onProgress,
+          );
           outName = `${base}-redacted.pdf`;
           break;
         case "reorder": {

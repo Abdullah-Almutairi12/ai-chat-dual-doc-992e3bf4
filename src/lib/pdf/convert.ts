@@ -172,56 +172,96 @@ export async function imagesToPdf(files: File[], onProgress?: ProgressFn): Promi
   return pdf.output("blob");
 }
 
-/** Word/Excel → PDF (text-based fallback). */
-export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<Blob> {
-  requireBrowser();
-  const jsPDF = await resolveJsPdfConstructor();
-  onProgress?.({ stage: "read", percent: 20 });
-  const text = await extractOfficeText(file);
-  const pdf = new jsPDF();
+function writeWrappedLines(
+  pdf: InstanceType<Awaited<ReturnType<typeof resolveJsPdfConstructor>>>,
+  text: string,
+  startY: number,
+  opts: { maxWidth?: number; lineHeight?: number; fontSize?: number; bold?: boolean } = {},
+): number {
+  const maxWidth = opts.maxWidth ?? 180;
+  const lineHeight = opts.lineHeight ?? 7;
   const rtl = isRtlDominant(text);
-  pdf.setFont("helvetica");
-  const lines = pdf.splitTextToSize(text.slice(0, 12000), 180);
-  let y = 20;
+  pdf.setFont("helvetica", opts.bold ? "bold" : "normal");
+  pdf.setFontSize(opts.fontSize ?? 11);
+  const lines: string[] = pdf.splitTextToSize(text, maxWidth);
+  let y = startY;
   for (const line of lines) {
-    if (y > 270) {
+    if (y > 280) {
       pdf.addPage();
       y = 20;
     }
-    pdf.text(line, rtl ? 190 : 14, y, { align: rtl ? "right" : "left" });
-    y += 7;
+    pdf.text(line, rtl ? 195 : 15, y, { align: rtl ? "right" : "left" });
+    y += lineHeight;
   }
-  onProgress?.({ stage: "done", percent: 100 });
-  return pdf.output("blob");
+  return y;
 }
 
-async function extractOfficeText(file: File): Promise<string> {
+/** Word/Excel/PowerPoint → PDF (client fallback — full-document, per-slide/sheet fidelity). */
+export async function officeToPdf(file: File, onProgress?: ProgressFn): Promise<Blob> {
+  requireBrowser();
+  const jsPDF = await resolveJsPdfConstructor();
+  onProgress?.({ stage: "read", percent: 15 });
+
   const ext = file.name.split(".").pop()?.toLowerCase();
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes.byteLength < 4) return "";
+  const pdf = new jsPDF();
 
-  if (ext === "xlsx" || ext === "xls") {
+  if (ext === "pptx") {
+    const { extractPptxSlideTexts } = await import("@/lib/pdf/office-text");
+    const slides = await extractPptxSlideTexts(bytes);
+    if (!slides.length) {
+      writeWrappedLines(pdf, "No readable content found in this presentation.", 20);
+    }
+    slides.forEach((lines, i) => {
+      if (i > 0) pdf.addPage();
+      let y = 20;
+      y = writeWrappedLines(pdf, `Slide ${i + 1}`, y, { fontSize: 14, bold: true, lineHeight: 9 }) + 3;
+      for (const line of lines) {
+        y = writeWrappedLines(pdf, line, y, { fontSize: 11 }) + 2;
+      }
+      onProgress?.({ stage: "compose", percent: 15 + Math.round(((i + 1) / slides.length) * 80), page: i + 1, pageCount: slides.length });
+    });
+  } else if (ext === "docx") {
+    const { extractDocxParagraphs } = await import("@/lib/pdf/office-text");
+    const paragraphs = await extractDocxParagraphs(bytes);
+    let y = 20;
+    if (!paragraphs.length) {
+      writeWrappedLines(pdf, "No readable content found in this document.", y);
+    }
+    paragraphs.forEach((para, i) => {
+      y = writeWrappedLines(pdf, para || " ", y, { fontSize: 11 }) + 3;
+      if ((i + 1) % 25 === 0) onProgress?.({ stage: "compose", percent: 15 + Math.round(((i + 1) / paragraphs.length) * 80) });
+    });
+  } else if (ext === "xlsx" || ext === "xls") {
     const XLSX = await loadXlsxModule();
     const wb = XLSX.read(bytes, { type: "array" });
-    return wb.SheetNames.map((n) => XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n\n");
+    wb.SheetNames.forEach((sheetName, i) => {
+      if (i > 0) pdf.addPage();
+      let y = 20;
+      y = writeWrappedLines(pdf, sheetName, y, { fontSize: 14, bold: true, lineHeight: 9 }) + 3;
+      const rows: string[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: false, defval: "" });
+      for (const row of rows) {
+        const line = row.map((cell) => String(cell ?? "")).join("  |  ");
+        if (line.trim()) y = writeWrappedLines(pdf, line, y, { fontSize: 9, lineHeight: 6 }) + 1;
+      }
+      onProgress?.({ stage: "compose", percent: 15 + Math.round(((i + 1) / wb.SheetNames.length) * 80) });
+    });
+  } else {
+    // Legacy .doc/.ppt/.xls or unknown binary formats — best-effort raw text decode.
+    let text = "";
+    try {
+      text = new TextDecoder("utf-8", { fatal: false })
+        .decode(bytes)
+        .replace(/[^\S\r\n\u0600-\u06FF]+/g, " ")
+        .slice(0, 50000);
+    } catch {
+      text = "";
+    }
+    writeWrappedLines(pdf, text || "Unable to read this legacy Office format. Please convert to .docx/.xlsx/.pptx first.", 20);
   }
 
-  if (ext === "docx" || ext === "pptx") {
-    const { unzipOfficeXmlText } = await import("@/lib/pdf/office-text");
-    const xmlPath = ext === "docx" ? "word/document.xml" : "ppt/slides/slide1.xml";
-    const text = await unzipOfficeXmlText(bytes, xmlPath);
-    if (text) return text.slice(0, 50000);
-  }
-
-  if (ext === "doc" || ext === "ppt") {
-    return "";
-  }
-
-  try {
-    return new TextDecoder("utf-8", { fatal: false }).decode(bytes).slice(0, 50000);
-  } catch {
-    return "";
-  }
+  onProgress?.({ stage: "done", percent: 100 });
+  return pdf.output("blob");
 }
 
 function loadImage(url: string): Promise<{ data: string; width: number; height: number }> {

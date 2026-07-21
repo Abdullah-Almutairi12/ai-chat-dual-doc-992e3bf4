@@ -44,17 +44,65 @@ async function inflateRawAsync(data: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
-function stripXmlText(xml: string): string {
-  return xml
-    .replace(/<w:tab[^/]*\/>/g, "\t")
-    .replace(/<[^>]+>/g, " ")
+function decodeXmlEntities(text: string): string {
+  return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&#39;/g, "'");
+}
+
+function stripXmlText(xml: string): string {
+  return decodeXmlEntities(
+    xml.replace(/<w:tab[^/]*\/>/g, "\t").replace(/<[^>]+>/g, " "),
+  )
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Split a Word body XML string into per-paragraph plain text (preserves line breaks). */
+function splitDocxParagraphs(xml: string): string[] {
+  const paragraphs: string[] = [];
+  const re = /<w:p[ >][\s\S]*?<\/w:p>/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(xml))) {
+    const text = stripXmlText(match[0]);
+    paragraphs.push(text);
+  }
+  return paragraphs;
+}
+
+/** Split a PowerPoint slide XML string into per-text-run lines (title/bullets). */
+function splitPptxSlideLines(xml: string): string[] {
+  const lines: string[] = [];
+  const re = /<a:p[ >][\s\S]*?<\/a:p>/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(xml))) {
+    const text = stripXmlText(match[0]);
+    if (text) lines.push(text);
+  }
+  return lines;
+}
+
+function listZipEntryNames(data: Uint8Array): string[] {
+  const eocd = findEndOfCentralDirectory(data);
+  if (eocd < 0) return [];
+  const cdCount = readUint16(data, eocd + 10);
+  let offset = readUint32(data, eocd + 16);
+  const names: string[] = [];
+  for (let i = 0; i < cdCount; i++) {
+    if (data[offset] !== 0x50 || data[offset + 1] !== 0x4b || data[offset + 2] !== 0x01 || data[offset + 3] !== 0x02) {
+      break;
+    }
+    const nameLen = readUint16(data, offset + 28);
+    const extraLen = readUint16(data, offset + 30);
+    const commentLen = readUint16(data, offset + 32);
+    const nameBytes = data.slice(offset + 46, offset + 46 + nameLen);
+    names.push(new TextDecoder().decode(nameBytes));
+    offset += 46 + nameLen + extraLen + commentLen;
+  }
+  return names;
 }
 
 async function readZipEntry(data: Uint8Array, path: string): Promise<Uint8Array | null> {
@@ -96,24 +144,29 @@ async function readZipEntry(data: Uint8Array, path: string): Promise<Uint8Array 
   return null;
 }
 
-export async function unzipOfficeXmlText(bytes: Uint8Array, primaryPath: string): Promise<string> {
-  if (bytes.byteLength < 512) return "";
-  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) return "";
+/** All paragraphs (in order) from a .docx's main document body. */
+export async function extractDocxParagraphs(bytes: Uint8Array): Promise<string[]> {
+  if (bytes.byteLength < 512 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return [];
+  const entry = await readZipEntry(bytes, "word/document.xml");
+  if (!entry) return [];
+  return splitDocxParagraphs(new TextDecoder().decode(entry));
+}
 
-  const entry = await readZipEntry(bytes, primaryPath);
-  if (!entry) {
-    if (primaryPath.startsWith("ppt/slides/")) {
-      const parts: string[] = [];
-      for (let n = 1; n <= 30; n++) {
-        const slidePath = `ppt/slides/slide${n}.xml`;
-        const slide = await readZipEntry(bytes, slidePath);
-        if (!slide) break;
-        parts.push(stripXmlText(new TextDecoder().decode(slide)));
-      }
-      return parts.join("\n\n");
-    }
-    return "";
+/** Text lines per slide (in slide order) from a .pptx — fixes the "first slide only" bug. */
+export async function extractPptxSlideTexts(bytes: Uint8Array): Promise<string[][]> {
+  if (bytes.byteLength < 512 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return [];
+
+  const slideNumbers = listZipEntryNames(bytes)
+    .map((name) => /^ppt\/slides\/slide(\d+)\.xml$/.exec(name))
+    .filter((m): m is RegExpExecArray => m != null)
+    .map((m) => Number(m[1]))
+    .sort((a, b) => a - b);
+
+  const slides: string[][] = [];
+  for (const n of slideNumbers) {
+    const entry = await readZipEntry(bytes, `ppt/slides/slide${n}.xml`);
+    if (!entry) continue;
+    slides.push(splitPptxSlideLines(new TextDecoder().decode(entry)));
   }
-
-  return stripXmlText(new TextDecoder().decode(entry));
+  return slides;
 }

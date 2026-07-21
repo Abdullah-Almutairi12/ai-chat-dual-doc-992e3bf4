@@ -15,6 +15,7 @@
     "supabase:functions:deploy": "supabase functions deploy send-welcome tap-renew --project-ref iwigbzxvjvoqkvuxjhxi"
   },
   "dependencies": {
+    "@cantoo/pdf-lib": "^2.7.4",
     "@hookform/resolvers": "^5.2.2",
     "@lovable.dev/cloud-auth-js": "^1.1.2",
     "@napi-rs/canvas": "^1.0.2",
