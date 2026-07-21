@@ -246,17 +246,32 @@ export async function extractAllPages(
   };
 
   const results: VisionPage[] = [];
+  let firstError: unknown;
   for (const page of pages) {
-    const { page: extracted, meta } = await extractWordPage(
-      config,
-      tool,
-      page.pageNumber,
-      pageCount,
-      page.base64,
-      layerMap.get(page.pageNumber),
-    );
-    results.push(extracted);
-    lastMeta = meta;
+    try {
+      const { page: extracted, meta } = await extractWordPage(
+        config,
+        tool,
+        page.pageNumber,
+        pageCount,
+        page.base64,
+        layerMap.get(page.pageNumber),
+      );
+      results.push(extracted);
+      lastMeta = meta;
+    } catch (err) {
+      // One page's AI call failing (rate limit, transient error, retired model,
+      // etc.) shouldn't sink the whole document — fusion falls back to the
+      // PDF's own text layer for this page. Only rethrow if EVERY page failed.
+      firstError ??= err;
+      logMaster("page_extract_failed", {
+        tool,
+        pageNumber: page.pageNumber,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+      results.push({ pageNumber: page.pageNumber, blocks: [] });
+    }
   }
+  if (results.every((r) => !r.blocks.length) && firstError) throw firstError;
   return { data: results, lastMeta };
 }

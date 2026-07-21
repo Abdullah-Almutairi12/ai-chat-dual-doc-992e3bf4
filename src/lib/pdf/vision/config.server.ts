@@ -25,8 +25,10 @@ const ANTHROPIC_KEY_NAMES = ["ANTHROPIC_API_KEY"] as const;
 const OPENAI_BASE_NAMES = ["OPENAI_API_BASE_URL", "OPENAI_BASE_URL", "AZURE_OPENAI_ENDPOINT"] as const;
 
 const DEFAULT_OPENAI_BASE = "https://api.openai.com/v1";
-const DEFAULT_OPENAI_MODEL = "gpt-4o";
-const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022";
+// claude-3-5-sonnet-20241022 was retired by Anthropic on 2025-10-28 — every
+// vision call silently failed and fell back to the old client-side renderer.
+const DEFAULT_OPENAI_MODEL = "gpt-5.5";
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
 
 function readEnv(name: string): string | undefined {
   const fromBag = globalThis.__PDFQUANTA_REQUEST_ENV__?.[name]?.trim();
@@ -76,6 +78,32 @@ export function alternateProvider(provider: VisionProvider): VisionProvider {
   return provider === "openai" ? "anthropic" : "openai";
 }
 
+/**
+ * Retired/deprecated model snapshots → current replacement. Guards against a
+ * stale env var (or an old default baked into a previous deploy) silently
+ * failing every single AI call forever with no visible error to the user.
+ */
+const RETIRED_MODEL_REPLACEMENTS: Record<string, string> = {
+  "claude-3-5-sonnet-20241022": "claude-sonnet-5",
+  "claude-3-5-sonnet-20240620": "claude-sonnet-5",
+  "claude-3-7-sonnet-20250219": "claude-sonnet-5",
+  "claude-3-5-haiku-20241022": "claude-haiku-4-5-20251001",
+  "claude-3-haiku-20240307": "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-20250514": "claude-sonnet-4-6",
+  "claude-opus-4-20250514": "claude-opus-4-8",
+  "gpt-4-vision-preview": "gpt-5.5",
+  "gpt-4-32k": "gpt-5.5",
+};
+
+function resolveModelId(raw: string): string {
+  const replacement = RETIRED_MODEL_REPLACEMENTS[raw.trim()];
+  if (replacement) {
+    console.warn(`[vision] model "${raw}" is retired — using "${replacement}" instead`);
+    return replacement;
+  }
+  return raw;
+}
+
 function normalizeOpenAiBase(raw: string | undefined): string {
   const trimmed = (raw ?? DEFAULT_OPENAI_BASE).trim().replace(/\/+$/, "");
   if (trimmed.endsWith("/v1")) return trimmed;
@@ -108,8 +136,8 @@ export function resolveVisionConfig(): VisionConfig {
     openaiKey,
     anthropicKey,
     openaiBaseUrl: normalizeOpenAiBase(firstEnv(OPENAI_BASE_NAMES)),
-    openaiModel: readEnv("OPENAI_VISION_MODEL") ?? readEnv("AZURE_OPENAI_DEPLOYMENT") ?? DEFAULT_OPENAI_MODEL,
-    anthropicModel: readEnv("ANTHROPIC_VISION_MODEL") ?? DEFAULT_ANTHROPIC_MODEL,
+    openaiModel: resolveModelId(readEnv("OPENAI_VISION_MODEL") ?? readEnv("AZURE_OPENAI_DEPLOYMENT") ?? DEFAULT_OPENAI_MODEL),
+    anthropicModel: resolveModelId(readEnv("ANTHROPIC_VISION_MODEL") ?? DEFAULT_ANTHROPIC_MODEL),
   };
 }
 
