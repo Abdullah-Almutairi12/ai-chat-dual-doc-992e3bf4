@@ -1,5 +1,6 @@
 import { createCanvas } from "@napi-rs/canvas";
 
+import { loadPdfjs } from "@/lib/pdf/vision/pdfjs-loader.server";
 import { VISION_RENDER_SCALE } from "@/lib/pdf/vision/schema";
 
 export type RenderedPage = {
@@ -15,7 +16,7 @@ export async function renderPdfToPageImages(
   pdfBytes: Uint8Array,
   scale = VISION_RENDER_SCALE,
 ): Promise<RenderedPage[]> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await loadPdfjs();
 
   const loadingTask = pdfjs.getDocument({
     data: pdfBytes,
@@ -23,7 +24,6 @@ export async function renderPdfToPageImages(
     disableFontFace: true,
     isEvalSupported: false,
     useWorkerFetch: false,
-    disableWorker: true,
   });
 
   const pdf = await loadingTask.promise;

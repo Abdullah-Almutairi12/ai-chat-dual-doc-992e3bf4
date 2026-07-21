@@ -1,4 +1,5 @@
 import { isRtlDominant, normalizeArabicText } from "@/lib/pdf/bidi";
+import { loadPdfjs } from "@/lib/pdf/vision/pdfjs-loader.server";
 import { VISION_RENDER_SCALE, type VisionBlock, type VisionLayout } from "@/lib/pdf/vision/schema";
 
 export type TextLayerBox = {
@@ -44,14 +45,13 @@ export async function extractPdfTextLayers(
   pdfBytes: Uint8Array,
   scale = VISION_RENDER_SCALE,
 ): Promise<PageTextLayer[]> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await loadPdfjs();
   const pdf = await pdfjs.getDocument({
     data: pdfBytes,
     useSystemFonts: true,
     disableFontFace: true,
     isEvalSupported: false,
     useWorkerFetch: false,
-    disableWorker: true,
   }).promise;
 
   const layers: PageTextLayer[] = [];
