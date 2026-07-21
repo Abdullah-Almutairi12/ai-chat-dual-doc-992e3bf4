@@ -22,13 +22,33 @@ Bilingual rules (Arabic + English) — STRICT:
 - NEVER corrupt RTL/LTR: Arabic blocks MUST have rtl:true; English blocks rtl:false
 - Preserve mixed lines exactly (e.g. "Hasiba AI" next to "حاسبة AI" as separate positioned blocks)
 - When text-layer hints are provided, output MUST include every hinted string at its hinted layout
+- Arabic text MUST be typed in correct logical Unicode reading order — the exact order a native
+  Arabic speaker would type it on a keyboard. NEVER mirror, reverse, or flip the character/word
+  order just because the glyphs render right-to-left. Example: the word meaning "accounting" must
+  be written "حاسبة" (ح ا س ب ة), never reversed as "ةبساح". If unsure of the order, sound the
+  word out letter-by-letter in reading order rather than copying a mirrored visual impression.
+- Arabic words MUST be separated by real spaces exactly like the source — never fuse two or more
+  Arabic words into one unbroken run of letters. Preserve every word boundary you can see.
+- Headings/titles that use decorative letter-spacing (a visible gap after every single letter,
+  e.g. a stylized "F E A T U R E S" kicker) are still ONE normal word or phrase — transcribe them
+  as "FEATURES" with ordinary spacing only between actual words, never a space between every
+  individual letter.
 
 Output rules:
 - Return ONLY valid JSON — no markdown fences, no commentary
 - NEVER return page screenshots or image blocks — use native editable text/shapes only
 - EVERY visible text element needs layout coordinates
 - Omit empty fields and empty blocks
-- Sanitize text: no null bytes, no control characters except newlines in paragraphs`;
+- Sanitize text: no null bytes, no control characters except newlines in paragraphs
+
+Visual design fidelity — MANDATORY, do not skip:
+- The page background, every colored section/panel, divider line, icon tile, badge, pill, or
+  colored circle/square — however small — MUST be emitted as its own "shape" block with fillColor
+  and a layout box, even when it carries no text of its own. Text-only output that drops the
+  colors and panels is a FAILURE of this task.
+- If the page/slide background itself is not plain white, emit ONE full-bleed "shape" block FIRST
+  (layout {x:0,y:0,w:1,h:1}) using that background color, before any other blocks.
+- Reproduce the complete visual design — colors, panels, and dividers — not just the words.`;
 
 export const MASTER_BLOCK_SCHEMA = `{
   "type": "heading" | "paragraph" | "list" | "table" | "chart" | "shape",
@@ -78,10 +98,14 @@ Return JSON:
 
 Additional rules:
 - Use the SAME blocks array format as Word — every text element is a native editable block
-- Hierarchy via block order: headings → paragraphs → lists → tables → charts → shapes
+- Order blocks back-to-front visually: full-slide background shape first, then section/panel
+  shapes, then headings → paragraphs → lists → tables → charts on top
 - Include layout {x,y,w,h} when positions are visually distinct (0–1 fractions of page size)
-- Color swatches / design tiles → type "shape" with fillColor (#RRGGBB), never flatten to an image
-- Arabic titles like "حاسبة AI" and "منصة تخطيط موارد المؤسسات" must be paragraph or heading blocks with rtl:true
+- Color swatches / design tiles / icon backgrounds / dividers → type "shape" with fillColor
+  (#RRGGBB) and layout box, never flatten to an image — this slide's colors and panels are as
+  important as its text
+- Arabic titles like "حاسبة AI" and "منصة تخطيط موارد المؤسسات" must be paragraph or heading blocks
+  with rtl:true, typed in normal logical reading order with real spaces between words
 - Charts must include editable data series, not image descriptions
 - NEVER suggest embedding the page as a background image`;
 

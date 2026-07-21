@@ -22,6 +22,16 @@ function totalTextLength(blocks: VisionBlock[]): number {
   return blocks.reduce((sum, b) => sum + (b.text?.length ?? 0) + (b.items?.join("").length ?? 0), 0);
 }
 
+/**
+ * Visual-design blocks the raw PDF text layer can never produce (it has no concept of
+ * fills, charts, or grids). These must survive even when we fall back to text-layer text
+ * for missing/insufficient prose, otherwise every backgrounds/swatch/chart the AI correctly
+ * saw gets thrown away just because body-text coverage looked low.
+ */
+function isVisualDesignBlock(block: VisionBlock): boolean {
+  return block.type === "shape" || block.type === "chart" || block.type === "table";
+}
+
 /** Merge Vision AI output with PDF text-layer for Adobe-grade layout fidelity. */
 export function fuseVisionWithTextLayer(
   aiPages: VisionPage[],
@@ -35,6 +45,7 @@ export function fuseVisionWithTextLayer(
 
     const layerChars = layer?.boxes.reduce((s, b) => s + b.text.length, 0) ?? 0;
     const aiChars = totalTextLength(blocks);
+    const visualBlocks = blocks.filter(isVisualDesignBlock);
 
     if (!blocks.length && layer?.boxes.length) {
       logMaster("fusion_text_layer_fallback", { page: page.pageNumber, boxes: layer.boxes.length });
@@ -48,7 +59,9 @@ export function fuseVisionWithTextLayer(
         layerChars,
       });
       if (aiChars < layerChars * 0.55) {
-        blocks = textLayerToBlocks(layer);
+        // Text coverage looks thin — refresh prose from the native text layer, but never
+        // discard shapes/charts/tables the AI already correctly saw and positioned.
+        blocks = sortBlocksByLayout([...visualBlocks, ...textLayerToBlocks(layer)]);
       } else {
         const enriched = blocks.map((block, i) => {
           if (block.layout?.x != null && block.layout?.y != null) return block;
@@ -86,6 +99,7 @@ export function enforceLanguageIntegrity(pages: VisionPage[], textLayers: PageTe
     );
     if (outChars >= layerChars * 0.45) return page;
     logMaster("language_integrity_restore", { page: page.pageNumber, outChars, layerChars });
-    return { ...page, blocks: textLayerToBlocks(layer) };
+    const visualBlocks = page.blocks.filter(isVisualDesignBlock);
+    return { ...page, blocks: sortBlocksByLayout([...visualBlocks, ...textLayerToBlocks(layer)]) };
   });
 }

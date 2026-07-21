@@ -278,7 +278,7 @@ export async function buildPptxFromVisionPages(
     }
 
     for (const block of blocks) {
-      if (!block.layout?.y && flowY >= PORTRAIT_HEIGHT_IN - 0.5) break;
+      if (block.layout?.y == null && flowY >= PORTRAIT_HEIGHT_IN - 0.5) break;
       flowY = renderBlockToSlide(slide, pptx, block, flowY, scannedBackground);
     }
 
