@@ -1,5 +1,4 @@
 import { normalizeArabicText } from "@/lib/pdf/bidi";
-import { layoutToDocxTwips } from "@/lib/pdf/layout-fidelity";
 import { blockRtl, fontFor, stripHexColor } from "@/lib/pdf/vision/block-layout.server";
 import { sortBlocksByLayout } from "@/lib/pdf/vision/fusion.server";
 import type { FidelityPageRender } from "@/lib/pdf/vision/build-pptx.server";
@@ -132,15 +131,12 @@ function blockToDocxElements(
   const { Paragraph, TextRun, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType, ShadingType } =
     docx;
 
-  const pos = block.layout ? layoutToDocxTwips(block.layout) : null;
-  const positionProps = pos
-    ? {
-        spacing: { before: pos.before, after: 40, line: 240 },
-        indent: blockRtl(block)
-          ? { right: pos.left, left: 0 }
-          : { left: pos.left },
-      }
-    : { spacing: { after: 80 } };
+  // Word is a flowing document format, not a pixel canvas — reusing the PDF's absolute x/y
+  // fractions as paragraph indent/spacing (rather than genuine relative flow) squeezes most
+  // blocks into a sliver of line width, wrapping Arabic text one letter per line. Use natural
+  // top-to-bottom flow with modest fixed spacing instead; blocks are already sorted by layout
+  // position (sortBlocksByLayout), so reading order is preserved without faking absolute coords.
+  const positionProps = { spacing: { before: 60, after: 120 } };
 
   if (block.type === "chart") {
     const rows = chartToTableRows(block);
