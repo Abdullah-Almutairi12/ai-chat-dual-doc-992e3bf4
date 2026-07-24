@@ -76,12 +76,24 @@ export function joinLineItems(line: PositionedText[]): string {
 /**
  * Fix common Arabic extraction artifacts: isolated presentation forms,
  * reversed word order within a line, and stray direction marks.
+ *
+ * Many PDF fonts encode Arabic glyphs using the Arabic Presentation Forms-A/B
+ * blocks (U+FB50–U+FDFF, U+FE70–U+FEFF) — each codepoint there is already a
+ * pre-shaped isolated/initial/medial/final GLYPH, not a joining letter. When
+ * that text is dropped into Word/PowerPoint as-is, the shaping engine treats
+ * each one as already-final and does not connect it to its neighbors, so the
+ * word renders as a row of disconnected ("straight") letters instead of
+ * cursive Arabic. NFC only performs canonical decomposition and does not
+ * touch these compatibility characters — NFKC additionally maps every
+ * presentation-form codepoint (and presentation-form ligatures) back to its
+ * standard joining Arabic letter sequence, which lets Word's renderer
+ * re-shape and connect the script correctly.
  */
 export function normalizeArabicText(text: string): string {
   return text
     .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
     .replace(/\u0640/g, "")
-    .normalize("NFC");
+    .normalize("NFKC");
 }
 
 /** CSS properties for correct Arabic cursive rendering in HTML exports. */
